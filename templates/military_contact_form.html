@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 style="margin-bottom:0.5rem">{% if contact %}Edit Contact{% else %}Add Military Contact{% endif %}</h2>
+<div class="card"><form method="POST">
+<div class="form-row">
+  <div><label>Contact Name *</label><input type="text" name="contact_name" value="{{ contact.contact_name if contact else '' }}" required placeholder="e.g. Lorena Henderson"></div>
+  <div><label>Title</label><input type="text" name="title" value="{{ contact.title if contact else '' }}" placeholder="e.g. Outreach Program Manager — OSBP"></div>
+</div>
+<div class="form-row">
+  <div><label>Email</label><input type="email" name="email" value="{{ contact.email if contact else '' }}"></div>
+  <div><label>Phone</label><input type="text" name="phone" value="{{ contact.phone if contact else '' }}"></div>
+</div>
+<div class="form-row">
+  <div><label>Assigned Base</label>
+    <select name="base_id"><option value="">— None —</option>
+      {% for b in all_bases %}<option value="{{ b.id }}" {% if contact and contact.base_id==b.id %}selected{% endif %}>{{ b.base_name }}</option>{% endfor %}
+    </select></div>
+  <div><label>Contact Role</label><input type="text" name="contact_role" value="{{ contact.contact_role if contact else 'Small Business POC' }}"></div>
+</div>
+<div class="form-row">
+  <div>
+    <label style="display:flex; align-items:center; gap:0.5rem"><input type="checkbox" name="decision_maker" value="1" style="width:auto" {% if contact and contact.decision_maker %}checked{% endif %}> Decision Maker</label>
+    <label style="display:flex; align-items:center; gap:0.5rem"><input type="checkbox" name="needs_followup" value="1" style="width:auto" {% if contact and contact.needs_followup %}checked{% endif %}> Needs Followup</label>
+  </div>
+</div>
+<label>Notes</label><textarea name="notes" rows="3">{{ contact.notes if contact and contact.notes else '' }}</textarea>
+<div style="margin-top:1rem; display:flex; gap:0.5rem">
+  <button type="submit" class="btn btn-primary">Save Contact</button>
+  <a href="/military/contacts" class="btn btn-outline">Cancel</a>
+</div>
+</form></div>
+{% endblock %}

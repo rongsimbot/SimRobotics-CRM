@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+    <h2>Companies</h2>
+    <a href="/companies/add" class="btn btn-primary">+ Add Company</a>
+</div>
+<form class="search-box" method="get">
+    <input type="text" name="q" value="{{ query }}" placeholder="Search companies...">
+    <button type="submit" class="btn btn-primary">Search</button>
+</form>
+<div class="card">
+<table>
+<thead><tr><th>Name</th><th>Sector</th><th>Region</th><th>Contacts</th><th>Actions</th></tr></thead>
+<tbody>
+{% for c in companies %}
+<tr>
+    <td><strong>{{ c.name }}</strong>{% if c.website %}<br><small><a href="{{ c.website }}" target="_blank">{{ c.website[:40] }}</a></small>{% endif %}</td>
+    <td>{{ c.sector or '-' }}</td>
+    <td>{{ c.region or '-' }}</td>
+    <td>{{ c.contact_count }}</td>
+    <td class="actions">
+        <a href="/companies/{{ c.id }}/edit" class="btn btn-outline btn-sm">Edit</a>
+        <a href="/contacts?company_id={{ c.id }}" class="btn btn-outline btn-sm">Contacts</a>
+        <form action="/companies/{{ c.id }}/delete" method="post" style="display:inline" onsubmit="return confirm('Delete this company?')">
+            <button class="btn btn-danger btn-sm">Del</button>
+        </form>
+    </td>
+</tr>
+{% endfor %}
+</tbody></table>
+{% if not companies %}<p style="text-align:center;padding:2rem;color:#888">No companies found.</p>{% endif %}
+</div>
+{% endblock %}

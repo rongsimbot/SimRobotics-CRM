@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem">
+  <h2>{{ base.base_name }}</h2>
+  <div class="actions">
+    <a href="/military/bases/{{ base.id }}/edit" class="btn btn-outline">Edit</a>
+    <form method="POST" action="/military/bases/{{ base.id }}/delete" style="display:inline" onsubmit="return confirm('Delete {{ base.base_name }}?')"><button class="btn btn-danger">Delete</button></form>
+  </div>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="num" style="font-size:1.2rem">{{ base.branch or '—' }}</div><div class="label">Branch</div></div>
+  <div class="stat"><div class="num">{{ base.city or '—' }}, {{ base.state or '—' }}</div><div class="label">Location</div></div>
+  <div class="stat"><div class="num">{{ base.status or '—' }}</div><div class="label">Status</div></div>
+  <div class="stat"><div class="num">{{ contacts|length }}</div><div class="label">Contacts</div></div>
+</div>
+
+<div class="card">
+  <p><strong>Command:</strong> {{ base.command_name or '—' }}</p>
+  <p><strong>Small Business Office:</strong> {{ base.small_business_office or '—' }}</p>
+  <p><strong>Contracting Office:</strong> {{ base.contracting_office or '—' }}</p>
+  <p><strong>Email:</strong> {% if base.sb_office_email %}<a href="mailto:{{ base.sb_office_email }}">{{ base.sb_office_email }}</a>{% else %}—{% endif %} | <strong>Phone:</strong> {{ base.sb_office_phone or '—' }}</p>
+  <p><strong>Website:</strong> {% if base.website %}<a href="{{ base.website }}" target="_blank">{{ base.website }}</a>{% else %}—{% endif %}</p>
+  <p><strong>Verified:</strong> {{ base.date_verified or '—' }} | <strong>Priority:</strong> {% if base.priority %}⭐ Yes{% else %}No{% endif %}</p>
+  {% if base.opportunity_notes %}<p style="margin-top:0.5rem; background:#f0fdf4; padding:0.8rem; border-radius:6px"><strong>Opportunity Notes:</strong><br>{{ base.opportunity_notes }}</p>{% endif %}
+  {% if base.next_action %}<p style="background:#fff7ed; padding:0.8rem; border-radius:6px"><strong>Next Action:</strong> {{ base.next_action }}</p>{% endif %}
+</div>
+
+{% if contacts %}
+<div class="card">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.8rem"><h3>Contacts</h3><a href="/military/contacts/add?base_id={{ base.id }}" class="btn btn-sm btn-primary">+ Add</a></div>
+  <table><thead><tr><th>Name</th><th>Title</th><th>Role</th><th>Email</th><th>Phone</th><th>Actions</th></tr></thead>
+    <tbody>{% for c in contacts %}<tr>
+      <td><a href="/military/contacts/{{ c.id }}"><strong>{{ c.contact_name }}</strong></a></td>
+      <td>{{ c.title or '—' }}</td><td>{{ c.contact_role or '—' }}</td>
+      <td>{% if c.email %}<small>{{ c.email }}</small>{% else %}—{% endif %}</td>
+      <td>{{ c.phone or '—' }}</td>
+      <td><a href="/military/contacts/{{ c.id }}/edit" class="btn btn-sm btn-outline">Edit</a></td>
+    </tr>{% endfor %}</tbody>
+  </table>
+</div>
+{% endif %}
+
+{% if outreach %}
+<div class="card"><h3 style="margin-bottom:0.8rem">Outreach History</h3>
+  <table><thead><tr><th>Date</th><th>Contact</th><th>Subject</th><th>Response</th><th>Status</th></tr></thead>
+    <tbody>{% for r in outreach %}<tr>
+      <td>{{ r.outreach_date or '—' }}</td><td>{{ r.contact_name or '—' }}</td>
+      <td>{{ r.subject or '—' }}</td><td>{{ r.response or '—' }}</td>
+      <td><span class="badge {% if r.status in ('Won','Briefing Completed') %}badge-done{% elif r.status in ('Lost','Archived') %}badge-research{% endif %}">{{ r.status }}</span></td>
+    </tr>{% endfor %}</tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

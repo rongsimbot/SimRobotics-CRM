@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+    <h2>{{ contact.first_name }} {{ contact.last_name }}</h2>
+    <div class="actions">
+        <a href="/contacts/{{ contact.id }}/edit" class="btn btn-primary">Edit</a>
+        <a href="/contacts" class="btn btn-outline">Back</a>
+    </div>
+</div>
+<div class="card">
+<table>
+    <tr><td style="width:150px;font-weight:600">Name</td><td>{{ contact.first_name }} {{ contact.last_name }}</td></tr>
+    <tr><td style="font-weight:600">Company</td><td>{{ contact.company_name or '-' }}</td></tr>
+    <tr><td style="font-weight:600">Role</td><td>{{ contact.role or '-' }}</td></tr>
+    <tr><td style="font-weight:600">Email</td><td>{% if contact.email %}<a href="mailto:{{ contact.email }}">{{ contact.email }}</a>{% else %}-{% endif %}</td></tr>
+    <tr><td style="font-weight:600">Phone</td><td>{{ contact.phone or '-' }}</td></tr>
+    <tr><td style="font-weight:600">LinkedIn</td><td>{% if contact.linkedin_url %}<a href="{{ contact.linkedin_url }}" target="_blank">{{ contact.linkedin_url }}</a>{% else %}-{% endif %}</td></tr>
+    <tr><td style="font-weight:600">Research</td><td><span class="badge {{ 'badge-research' if contact.needs_research else 'badge-done' }}">{{ 'Needs Research' if contact.needs_research else 'Done' }}</span></td></tr>
+    <tr><td style="font-weight:600">Created</td><td>{{ contact.created_at }}</td></tr>
+</table>
+</div>
+<h3 style="margin-top:1.5rem">Interactions</h3>
+<a href="/contacts/{{ contact.id }}/interactions/add" class="btn btn-outline btn-sm" style="margin-bottom:1rem">+ Log Interaction</a>
+<div class="card">
+<table>
+<thead><tr><th>Date</th><th>Channel</th><th>Notes</th><th>Next Action</th></tr></thead>
+<tbody>
+{% for i in interactions %}
+<tr>
+    <td>{{ i.interaction_date }}</td>
+    <td>{{ i.channel or '-' }}</td>
+    <td>{{ i.notes or '-' }}</td>
+    <td>{{ i.next_action or '-' }}</td>
+</tr>
+{% endfor %}
+</tbody></table>
+{% if not interactions %}<p style="text-align:center;padding:2rem;color:#888">No interactions logged yet.</p>{% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 style="margin-bottom:0.5rem">👥 Military Contacts</h2>
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem">
+  <a href="/military/contacts/add" class="btn btn-primary">+ Add Contact</a>
+</div>
+
+<div class="search-box">
+  <form method="GET" action="/military/contacts" style="display:flex; width:100%; gap:0.5rem">
+    <input type="text" name="q" value="{{ query }}" placeholder="Search by name, title, email..." style="flex:1">
+    <select name="base_id" onchange="this.form.submit()" style="width:auto">
+      <option value="">All Bases</option>
+      {% for b in all_bases %}<option value="{{ b.id }}" {% if base_id==b.id|string %}selected{% endif %}>{{ b.base_name }}</option>{% endfor %}
+    </select>
+    <button type="submit" class="btn btn-primary">Search</button>
+  </form>
+</div>
+
+<div class="card">
+  <p style="margin-bottom:0.5rem; color:#888; font-size:0.85rem">{{ total }} contacts found</p>
+  <table><thead><tr>
+    <th><a href="?q={{ query }}&base_id={{ base_id }}&sort=contact_name&order={% if sort=='contact_name' and order=='asc' %}desc{% else %}asc{% endif %}">Name {% if sort=='contact_name' %}{% if order=='asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
+    <th><a href="?q={{ query }}&base_id={{ base_id }}&sort=title&order={% if sort=='title' and order=='asc' %}desc{% else %}asc{% endif %}">Title {% if sort=='title' %}{% if order=='asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
+    <th><a href="?q={{ query }}&base_id={{ base_id }}&sort=contact_role&order={% if sort=='contact_role' and order=='asc' %}desc{% else %}asc{% endif %}">Role {% if sort=='contact_role' %}{% if order=='asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
+    <th><a href="?q={{ query }}&base_id={{ base_id }}&sort=email&order={% if sort=='email' and order=='asc' %}desc{% else %}asc{% endif %}">Email {% if sort=='email' %}{% if order=='asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
+    <th><a href="?q={{ query }}&base_id={{ base_id }}&sort=phone&order={% if sort=='phone' and order=='asc' %}desc{% else %}asc{% endif %}">Phone {% if sort=='phone' %}{% if order=='asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
+    <th>Base</th><th>Actions</th>
+  </tr></thead><tbody>
+    {% for c in contacts %}<tr>
+      <td><a href="/military/contacts/{{ c.id }}"><strong>{{ c.contact_name }}</strong></a></td>
+      <td>{{ c.title or '—' }}</td><td>{{ c.contact_role or '—' }}</td>
+      <td>{% if c.email %}<small>{{ c.email }}</small>{% else %}—{% endif %}</td>
+      <td>{{ c.phone or '—' }}</td>
+      <td>{{ c.base_name or '—' }}</td>
+      <td class="actions">
+        <a href="/military/contacts/{{ c.id }}/edit" class="btn btn-sm btn-outline">Edit</a>
+        <form method="POST" action="/military/contacts/{{ c.id }}/delete" style="display:inline" onsubmit="return confirm('Delete this contact?')"><button class="btn btn-sm btn-danger">Del</button></form>
+      </td>
+    </tr>{% else %}
+    <tr><td colspan="7" style="text-align:center;color:#888;padding:2rem">No contacts found.</td></tr>{% endfor %}
+  </tbody></table>
+  {% if total_pages > 1 %}
+  <div class="pagination">
+    {% if page > 1 %}<a href="?q={{ query }}&base_id={{ base_id }}&sort={{ sort }}&order={{ order }}&page={{ page-1 }}">←</a>{% else %}<span class="disabled">←</span>{% endif %}
+    <span class="current">{{ page }}/{{ total_pages }}</span>
+    {% if page < total_pages %}<a href="?q={{ query }}&base_id={{ base_id }}&sort={{ sort }}&order={{ order }}&page={{ page+1 }}">→</a>{% else %}<span class="disabled">→</span>{% endif %}
+  </div>{% endif %}
+</div>
+{% endblock %}

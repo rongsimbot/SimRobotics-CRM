@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 style="margin-bottom:0.5rem">🏛️ Military Base List</h2>
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem">
+  <a href="/military/bases/add" class="btn btn-primary">+ Add Base</a>
+  {% if priority %}<a href="?" class="btn btn-sm btn-outline">Clear Priority Filter ★</a>{% endif %}
+</div>
+
+<div class="search-box">
+  <form method="GET" action="/military/bases" style="display:flex; width:100%; gap:0.5rem; flex-wrap:wrap">
+    <input type="text" name="q" value="{{ query }}" placeholder="Search bases, cities, commands..." style="flex:1; min-width:150px">
+    <select name="branch" onchange="this.form.submit()" style="width:auto">
+      <option value="">All Branches</option>
+      {% for b in branches %}<option value="{{ b.branch }}" {% if branch==b.branch %}selected{% endif %}>{{ b.branch }}</option>{% endfor %}
+    </select>
+    <select name="state" onchange="this.form.submit()" style="width:auto">
+      <option value="">All States</option>
+      {% for s in states %}<option value="{{ s.state }}" {% if state==s.state %}selected{% endif %}>{{ s.state }}</option>{% endfor %}
+    </select>
+    <button type="submit" class="btn btn-primary">Search</button>
+  </form>
+</div>
+
+<div class="card">
+  <p style="margin-bottom:0.5rem; color:#888; font-size:0.85rem">{{ total }} bases found</p>
+  <table>
+    <thead><tr>
+      <th><a href="?q={{ query }}&branch={{ branch }}&state={{ state }}&sort=base_name&order={% if sort=='base_name' and order=='asc' %}desc{% else %}asc{% endif %}">Base Name {% if sort=='base_name' %}{% if order=='asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
+      <th><a href="?q={{ query }}&branch={{ branch }}&state={{ state }}&sort=branch&order={% if sort=='branch' and order=='asc' %}desc{% else %}asc{% endif %}">Branch {% if sort=='branch' %}{% if order=='asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
+      <th><a href="?q={{ query }}&branch={{ branch }}&state={{ state }}&sort=city&order={% if sort=='city' and order=='asc' %}desc{% else %}asc{% endif %}">City {% if sort=='city' %}{% if order=='asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
+      <th><a href="?q={{ query }}&branch={{ branch }}&state={{ state }}&sort=state&order={% if sort=='state' and order=='asc' %}desc{% else %}asc{% endif %}">State {% if sort=='state' %}{% if order=='asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
+      <th><a href="?q={{ query }}&branch={{ branch }}&state={{ state }}&sort=command_name&order={% if sort=='command_name' and order=='asc' %}desc{% else %}asc{% endif %}">Command {% if sort=='command_name' %}{% if order=='asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
+      <th><a href="?q={{ query }}&branch={{ branch }}&state={{ state }}&sort=contact_count&order={% if sort=='contact_count' and order=='asc' %}desc{% else %}asc{% endif %}">Contacts {% if sort=='contact_count' %}{% if order=='asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
+      <th><a href="?q={{ query }}&branch={{ branch }}&state={{ state }}&sort=priority&order={% if sort=='priority' and order=='asc' %}desc{% else %}asc{% endif %}">Priority {% if sort=='priority' %}{% if order=='asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
+      <th>Actions</th>
+    </tr></thead>
+    <tbody>
+      {% for b in bases %}
+      <tr>
+        <td><a href="/military/bases/{{ b.id }}"><strong>{{ b.base_name }}</strong></a></td>
+        <td><small>{{ b.branch or '—' }}</small></td>
+        <td>{{ b.city or '—' }}</td>
+        <td>{{ b.state or '—' }}</td>
+        <td><small>{{ b.command_name or '—' }}</small></td>
+        <td>{{ b.contact_count }}</td>
+        <td>{% if b.priority %}⭐{% endif %}</td>
+        <td class="actions">
+          <a href="/military/bases/{{ b.id }}/edit" class="btn btn-sm btn-outline">Edit</a>
+          <form method="POST" action="/military/bases/{{ b.id }}/delete" style="display:inline" onsubmit="return confirm('Delete {{ b.base_name }}?')">
+            <button class="btn btn-sm btn-danger">Del</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8" style="text-align:center;color:#888;padding:2rem">No bases found.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if total_pages > 1 %}
+  <div class="pagination">
+    {% if page > 1 %}<a href="?q={{ query }}&branch={{ branch }}&state={{ state }}&sort={{ sort }}&order={{ order }}&page={{ page-1 }}">← Prev</a>{% else %}<span class="disabled">← Prev</span>{% endif %}
+    <span class="current">{{ page }} / {{ total_pages }}</span>
+    {% if page < total_pages %}<a href="?q={{ query }}&branch={{ branch }}&state={{ state }}&sort={{ sort }}&order={{ order }}&page={{ page+1 }}">Next →</a>{% else %}<span class="disabled">Next →</span>{% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

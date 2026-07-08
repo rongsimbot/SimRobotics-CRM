@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 style="margin-bottom:0.5rem">{% if opp %}Edit Opportunity{% else %}Add Opportunity{% endif %}</h2>
+<div class="card">
+  <form method="POST">
+    <div class="form-row">
+      <div>
+        <label>Opportunity Name *</label>
+        <input type="text" name="opportunity_name" value="{{ opp.opportunity_name if opp else '' }}" required placeholder="e.g. Joint All-Domain C2 System">
+      </div>
+      <div>
+        <label>Base</label>
+        <select name="base_id">
+          <option value="">— None —</option>
+          {% for b in all_bases %}
+          <option value="{{ b.id }}" {% if opp and opp.base_id == b.id %}selected{% endif %}>{{ b.base_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div>
+        <label>Solicitation Number</label>
+        <input type="text" name="solicitation_number" value="{{ opp.solicitation_number if opp else '' }}" placeholder="e.g. FA8730-24-R-0001">
+      </div>
+      <div>
+        <label>Contract Value ($)</label>
+        <input type="number" name="contract_value" step="0.01" value="{{ opp.contract_value if opp else '' }}" placeholder="e.g. 5000000">
+      </div>
+    </div>
+    <div class="form-row">
+      <div>
+        <label>Phase</label>
+        <select name="phase">
+          <option value="">— Select —</option>
+          {% for p in phases %}
+          <option value="{{ p }}" {% if opp and opp.phase == p %}selected{% endif %}>{{ p }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label>Estimated Award Date</label>
+        <input type="date" name="estimated_award" value="{{ opp.estimated_award if opp else '' }}">
+      </div>
+    </div>
+    <div class="form-row">
+      <div>
+        <label>Probability (%)</label>
+        <input type="range" name="probability" min="0" max="100" value="{{ opp.probability if opp else 0 }}" oninput="this.nextElementSibling.value=this.value+'%'">
+        <output style="font-size:0.85rem;color:#888">{{ opp.probability if opp else 0 }}%</output>
+      </div>
+      <div>
+        <label>Service Type</label>
+        <input type="text" name="service_type" value="{{ opp.service_type if opp else '' }}" placeholder="e.g. AI/ML, Cybersecurity, Cloud Migration">
+      </div>
+    </div>
+    <label>Notes</label>
+    <textarea name="notes" rows="3">{{ opp.notes if opp and opp.notes else '' }}</textarea>
+    <div style="margin-top:1rem; display:flex; gap:0.5rem">
+      <button type="submit" class="btn btn-primary">Save Opportunity</button>
+      <a href="/military/opportunities" class="btn btn-outline">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

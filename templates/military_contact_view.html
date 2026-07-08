@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem">
+  <h2>{{ contact.contact_name }}</h2>
+  <div class="actions"><a href="/military/contacts/{{ contact.id }}/edit" class="btn btn-outline">Edit</a>
+    <form method="POST" action="/military/contacts/{{ contact.id }}/delete" style="display:inline" onsubmit="return confirm('Delete this contact?')"><button class="btn btn-danger">Delete</button></form>
+  </div>
+</div>
+<div class="card">
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem">
+    <p><strong>Title:</strong> {{ contact.title or '—' }}</p><p><strong>Role:</strong> {{ contact.contact_role or '—' }}</p>
+    <p><strong>Base:</strong> {{ contact.base_name or '—' }}</p>
+    <p><strong>Email:</strong> {% if contact.email %}<a href="mailto:{{ contact.email }}">{{ contact.email }}</a>{% else %}—{% endif %}</p>
+    <p><strong>Phone:</strong> {{ contact.phone or '—' }}</p>
+    <p><strong>Decision Maker:</strong> {% if contact.decision_maker %}✅ Yes{% else %}No{% endif %} | <strong>Followup:</strong> {% if contact.needs_followup %}⚠️ Yes{% else %}No{% endif %}</p>
+  </div>
+  {% if contact.notes %}<p style="margin-top:0.8rem"><strong>Notes:</strong> {{ contact.notes }}</p>{% endif %}
+</div>
+
+<div class="card">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.8rem"><h3>Outreach History</h3><a href="/military/outreach/add?contact_id={{ contact.id }}" class="btn btn-sm btn-primary">+ Log Outreach</a></div>
+  {% if outreach %}
+  <table><thead><tr><th>Date</th><th>Subject</th><th>Response</th><th>Next Action</th><th>Status</th></tr></thead>
+    <tbody>{% for r in outreach %}<tr>
+      <td>{{ r.outreach_date or '—' }}</td><td>{{ r.subject or '—' }}</td><td>{{ r.response or '—' }}</td>
+      <td>{{ r.next_action or '—' }}{% if r.follow_up_date %}<br><small>{{ r.follow_up_date }}</small>{% endif %}</td>
+      <td><span class="badge {% if r.status in ('Won','Briefing Completed') %}badge-done{% elif r.status in ('Lost','Archived') %}badge-research{% endif %}">{{ r.status }}</span></td>
+    </tr>{% endfor %}</tbody>
+  </table>
+  {% else %}<p style="color:#888">No outreach recorded yet.</p>{% endif %}
+</div>
+{% endblock %}

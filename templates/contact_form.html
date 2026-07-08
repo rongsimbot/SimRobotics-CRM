@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 style="margin-bottom:1rem">{{ 'Edit' if contact else 'Add' }} Contact</h2>
+<div class="card">
+<form method="post">
+    <div class="form-row">
+        <div><label>First Name *</label><input type="text" name="first_name" value="{{ contact.first_name if contact else '' }}" required></div>
+        <div><label>Last Name *</label><input type="text" name="last_name" value="{{ contact.last_name if contact else '' }}" required></div>
+    </div>
+    <div class="form-row">
+        <div><label>Company</label>
+            <select name="company_id">
+                <option value="">-- Select --</option>
+                {% for comp in all_companies %}
+                <option value="{{ comp.id }}" {{ 'selected' if contact and contact.company_id == comp.id else '' }}>{{ comp.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div><label>Role</label><input type="text" name="role" value="{{ contact.role if contact else '' }}"></div>
+    </div>
+    <div class="form-row">
+        <div><label>Email</label><input type="email" name="email" value="{{ contact.email if contact else '' }}"></div>
+        <div><label>Phone</label><input type="text" name="phone" value="{{ contact.phone if contact else '' }}"></div>
+    </div>
+    <div class="form-row">
+        <div><label>LinkedIn URL</label><input type="url" name="linkedin_url" value="{{ contact.linkedin_url if contact else '' }}"></div>
+        <div><label>Needs Research?</label>
+            <select name="needs_research">
+                <option value="1" {{ 'selected' if not contact or contact.needs_research else '' }}>Yes</option>
+                <option value="0" {{ 'selected' if contact and not contact.needs_research else '' }}>No</option>
+            </select>
+        </div>
+    </div>
+    <div style="margin-top:1.5rem;display:flex;gap:0.5rem">
+        <button type="submit" class="btn btn-primary">Save</button>
+        <a href="/contacts" class="btn btn-outline">Cancel</a>
+    </div>
+</form>
+</div>
+{% endblock %}

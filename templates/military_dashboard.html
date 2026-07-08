@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 style="margin-bottom:1rem">📋 Military CRM Dashboard</h2>
+<div class="stats">
+  <div class="stat"><div class="num">{{ stats.bases }}</div><div class="label">Military Bases</div></div>
+  <div class="stat"><div class="num">{{ stats.contacts }}</div><div class="label">Base Contacts</div></div>
+  <div class="stat"><div class="num">{{ stats.outreach }}</div><div class="label">Active Outreach</div></div>
+  <div class="stat"><div class="num">{{ stats.priority }}</div><div class="label">Priority Bases</div></div>
+</div>
+
+<div style="display:grid; grid-template-columns:2fr 1fr; gap:1.5rem">
+  <div>
+    <div class="card">
+      <h3 style="margin-bottom:0.8rem">Recent Outreach Activity</h3>
+      {% if recent_outreach %}
+      <table>
+        <thead><tr><th>Date</th><th>Base</th><th>Contact</th><th>Subject</th><th>Status</th></tr></thead>
+        <tbody>
+          {% for r in recent_outreach %}
+          <tr>
+            <td>{{ r.outreach_date or '—' }}</td>
+            <td>{{ r.base_name or '—' }}</td>
+            <td>{{ r.contact_name or '—' }}</td>
+            <td>{{ r.subject or '—' }}</td>
+            <td><span class="badge {% if r.status in ('Won','Briefing Completed') %}badge-done{% elif r.status in ('Lost','Archived') %}badge-research{% endif %}">{{ r.status }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p style="color:#888">No outreach activity recorded yet. <a href="/military/outreach/add">Start your first outreach</a>.</p>
+      {% endif %}
+    </div>
+  </div>
+  <div>
+    <div class="card">
+      <h3 style="margin-bottom:0.8rem">Bases by Branch</h3>
+      {% for b in branch_stats %}
+      <div style="display:flex; justify-content:space-between; padding:0.3rem 0; font-size:0.85rem; border-bottom:1px solid #eee">
+        <span>{{ b.branch }}</span><strong>{{ b.cnt }}</strong>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:0.8rem; margin-top:1rem">
+  <a href="/military/bases" class="btn btn-outline" style="text-align:center">Manage Bases →</a>
+  <a href="/military/contacts" class="btn btn-outline" style="text-align:center">Manage Contacts →</a>
+  <a href="/military/outreach" class="btn btn-primary" style="text-align:center">Outreach & Planning →</a>
+  <a href="/military/opportunities" class="btn btn-outline" style="text-align:center">Opportunities →</a>
+</div>
+{% endblock %}

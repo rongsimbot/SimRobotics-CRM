@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 style="margin-bottom:1rem">{{ 'Edit' if company else 'Add' }} Company</h2>
+<div class="card">
+<form method="post">
+    <div class="form-row">
+        <div><label>Company Name *</label><input type="text" name="name" value="{{ company.name if company else '' }}" required></div>
+        <div><label>Sector</label><input type="text" name="sector" value="{{ company.sector if company else '' }}"></div>
+    </div>
+    <div class="form-row">
+        <div><label>Region</label><input type="text" name="region" value="{{ company.region if company else '' }}"></div>
+        <div><label>Website</label><input type="url" name="website" value="{{ company.website if company else '' }}" placeholder="https://..."></div>
+    </div>
+    <div style="margin-top:1.5rem;display:flex;gap:0.5rem">
+        <button type="submit" class="btn btn-primary">Save</button>
+        <a href="/companies" class="btn btn-outline">Cancel</a>
+    </div>
+</form>
+</div>
+{% endblock %}

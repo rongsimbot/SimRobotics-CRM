@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 style="margin-bottom:0.5rem">{% if base %}Edit Base{% else %}Add Military Base{% endif %}</h2>
+<div class="card"><form method="POST">
+<div class="form-row">
+  <div><label>Base Name *</label><input type="text" name="base_name" value="{{ base.base_name if base else '' }}" required></div>
+  <div><label>Branch</label>
+    <select name="branch"><option value="">— Select —</option>
+      {% for b in ['Army','Navy','Air Force','Marine Corps','Space Force','Coast Guard','Air National Guard','Army National Guard','Air Force Reserve','Multi-Branch','Joint/SOCOM','DoD Agency','NASA (Federal)','DOJ/FBI','US Marine Corps'] %}
+      <option value="{{ b }}" {% if base and base.branch==b %}selected{% endif %}>{{ b }}</option>{% endfor %}
+    </select></div>
+</div>
+<div class="form-row">
+  <div><label>City</label><input type="text" name="city" value="{{ base.city if base else '' }}"></div>
+  <div><label>State</label><input type="text" name="state" value="{{ base.state if base else '' }}"></div>
+</div>
+<div class="form-row">
+  <div><label>Country</label><input type="text" name="country" value="{{ base.country if base else 'USA' }}"></div>
+  <div><label>Command / Tenant Org</label><input type="text" name="command_name" value="{{ base.command_name if base else '' }}"></div>
+</div>
+<div class="form-row">
+  <div><label>Small Business Office</label><textarea name="small_business_office" rows="2">{{ base.small_business_office if base and base.small_business_office else '' }}</textarea></div>
+  <div><label>Contracting Office</label><textarea name="contracting_office" rows="2">{{ base.contracting_office if base and base.contracting_office else '' }}</textarea></div>
+</div>
+<div class="form-row">
+  <div><label>SB Office Email</label><input type="email" name="sb_office_email" value="{{ base.sb_office_email if base else '' }}"></div>
+  <div><label>SB Office Phone</label><input type="text" name="sb_office_phone" value="{{ base.sb_office_phone if base else '' }}"></div>
+</div>
+<div class="form-row">
+  <div><label>Website</label><input type="url" name="website" value="{{ base.website if base else '' }}"></div>
+  <div><label>Date Verified</label><input type="date" name="date_verified" value="{{ base.date_verified if base else '' }}"></div>
+</div>
+<div class="form-row">
+  <div><label>Status</label>
+    <select name="status">{% for s in ['Active','BRAC Candidate','Realigned','Closed'] %}<option value="{{ s }}" {% if base and base.status==s %}selected{% endif %}>{{ s }}</option>{% endfor %}</select></div>
+  <div><label style="padding-top:1.5rem"><input type="checkbox" name="priority" value="1" style="width:auto" {% if base and base.priority %}checked{% endif %}> Priority Installation ★</label></div>
+</div>
+<label>Opportunity Notes</label><textarea name="opportunity_notes" rows="2">{{ base.opportunity_notes if base and base.opportunity_notes else '' }}</textarea>
+<label>Next Action</label><input type="text" name="next_action" value="{{ base.next_action if base else '' }}">
+<label>Additional Notes</label><textarea name="notes" rows="2">{{ base.notes if base and base.notes else '' }}</textarea>
+<div style="margin-top:1rem; display:flex; gap:0.5rem">
+  <button type="submit" class="btn btn-primary">Save Base</button>
+  <a href="/military/bases" class="btn btn-outline">Cancel</a>
+</div>
+</form></div>
+{% endblock %}

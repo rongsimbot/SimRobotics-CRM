@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 style="margin-bottom:1rem">Dashboard</h2>
+<div class="stats">
+    <div class="stat"><div class="num">{{ stats.companies }}</div><div class="label">Companies</div></div>
+    <div class="stat"><div class="num">{{ stats.contacts }}</div><div class="label">Contacts</div></div>
+    <div class="stat"><div class="num">{{ stats.interactions }}</div><div class="label">Interactions</div></div>
+    <div class="stat"><div class="num">{{ stats.research }}</div><div class="label">Need Research</div></div>
+</div>
+<div style="text-align:center;color:#888;font-size:0.8rem">
+    Database: <span class="db-badge {{ 'db-postgres' if db == 'postgresql' else 'db-sqlite' }}">{{ db }}</span>
+    &nbsp;|&nbsp; <small>Auto-switches to PostgreSQL when tunnel is active</small>
+</div>
+{% endblock %}
