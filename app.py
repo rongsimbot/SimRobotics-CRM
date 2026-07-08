@@ -210,7 +210,7 @@ def military_base_form(id=None):
         cols = "base_name,branch,state,country,city,command_name,small_business_office,contracting_office,sb_office_email,sb_office_phone,website,date_verified,status,opportunity_notes,next_action,notes,priority"
         if id:
             f.append(id)
-            query(f"UPDATE military_bases SET {','.join(c.split(',')[i]+'=%s' for i,c in enumerate(cols.split(',')))} WHERE id=%s", f)
+            query(f"UPDATE military_bases SET {','.join(c+'=%s' for c in cols.split(','))} WHERE id=%s", f)
         else:
             query(f"INSERT INTO military_bases ({cols}) VALUES ({','.join('%s' for _ in f)})", f)
         flash('Base saved!', 'success'); return redirect('/military/bases')
