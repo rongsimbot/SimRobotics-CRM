@@ -14,7 +14,6 @@
     </form>
   </div>
 </div>
-
 <div class="stats">
   <div class="stat"><div class="num">{{ stats.total }}</div><div class="label">Total Recipients</div></div>
   <div class="stat"><div class="num">{{ stats.validated }}</div><div class="label">Validated</div></div>
@@ -27,74 +26,40 @@
   <div class="stat"><div class="num">{{ stats.delivered }}</div><div class="label">Delivered</div></div>
   <div class="stat"><div class="num">{{ stats.pending_validation }}</div><div class="label">Pending Validation</div></div>
 </div>
-
 <div class="card" style="margin-top:1.5rem;">
-  <h3 style="margin:0 0 0.5rem 0;">Recipients ({{ stats.total }})</h3>
-
+  <h3 style="margin:0 0 0.75rem 0;">Recipients ({{ stats.total }})</h3>
   {% if total_pages > 1 %}
-  <div style="margin-bottom:0.75rem;display:flex;justify-content:center;align-items:center;gap:0.5rem;flex-wrap:wrap;">
-    {% if page > 1 %}
-    <a class="btn btn-outline btn-sm" href="?page=1&sort={{ sort }}&order={{ order }}">&laquo; First</a>
-    <a class="btn btn-outline btn-sm" href="?page={{ page-1 }}&sort={{ sort }}&order={{ order }}">Prev</a>
-    {% endif %}
-    <span style="color:#666;font-size:0.85rem;">Page {{ page }} of {{ total_pages }} ({{ ((page-1)*50 + 1) }}-{{ [page*50, stats.total]|min }} of {{ stats.total }})</span>
-    {% if page < total_pages %}
-    <a class="btn btn-outline btn-sm" href="?page={{ page+1 }}&sort={{ sort }}&order={{ order }}">Next</a>
-    <a class="btn btn-outline btn-sm" href="?page={{ total_pages }}&sort={{ sort }}&order={{ order }}">Last &raquo;</a>
-    {% endif %}
+  <div style="margin-bottom:1rem;display:flex;justify-content:center;align-items:center;gap:0.4rem;flex-wrap:wrap;padding:0.5rem;background:#f8f9fa;border-radius:6px;">
+    {% if page > 1 %}<a href="?page=1&sort={{ sort }}&order={{ order }}" class="btn btn-outline btn-sm">&laquo; First</a><a href="?page={{ page-1 }}&sort={{ sort }}&order={{ order }}" class="btn btn-outline btn-sm">&lsaquo; Prev</a>{% endif %}
+    <span style="font-weight:600;color:#333;font-size:0.85rem;padding:0 0.5rem;">Page {{ page }} of {{ total_pages }} ({{ ((page-1)*50 + 1) }}-{{ [page*50, stats.total]|min }} of {{ stats.total }})</span>
+    {% if page < total_pages %}<a href="?page={{ page+1 }}&sort={{ sort }}&order={{ order }}" class="btn btn-outline btn-sm">Next &rsaquo;</a><a href="?page={{ total_pages }}&sort={{ sort }}&order={{ order }}" class="btn btn-outline btn-sm">Last &raquo;</a>{% endif %}
   </div>
   {% endif %}
-
   <table>
-    <thead>
-      <tr>
-        <th><a href="?sort=first_name&order={% if sort=='first_name' %}{{ next_order }}{% else %}asc{% endif %}">Contact {% if sort=='first_name' %}{% if order=='asc' %}&#9650;{% else %}&#9660;{% endif %}{% endif %}</a></th>
-        <th><a href="?sort=email&order={% if sort=='email' %}{{ next_order }}{% else %}asc{% endif %}">Email {% if sort=='email' %}{% if order=='asc' %}&#9650;{% else %}&#9660;{% endif %}{% endif %}</a></th>
-        <th><a href="?sort=company_name&order={% if sort=='company_name' %}{{ next_order }}{% else %}asc{% endif %}">Company {% if sort=='company_name' %}{% if order=='asc' %}&#9650;{% else %}&#9660;{% endif %}{% endif %}</a></th>
-        <th><a href="?sort=sector&order={% if sort=='sector' %}{{ next_order }}{% else %}asc{% endif %}">Sector {% if sort=='sector' %}{% if order=='asc' %}&#9650;{% else %}&#9660;{% endif %}{% endif %}</a></th>
-        <th><a href="?sort=validation_status&order={% if sort=='validation_status' %}{{ next_order }}{% else %}asc{% endif %}">Validation {% if sort=='validation_status' %}{% if order=='asc' %}&#9650;{% else %}&#9660;{% endif %}{% endif %}</a></th>
-        <th><a href="?sort=send_status&order={% if sort=='send_status' %}{{ next_order }}{% else %}asc{% endif %}">Send Status {% if sort=='send_status' %}{% if order=='asc' %}&#9650;{% else %}&#9660;{% endif %}{% endif %}</a></th>
-      </tr>
-    </thead>
+    <thead><tr style="background:#f0f2f5;">
+      <th><a href="?sort=last_name&order={% if sort=='last_name' %}{{ next_order }}{% else %}asc{% endif %}" style="color:#555;text-decoration:none;">Contact {% if sort=='last_name' %}{% if order=='asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
+      <th><a href="?sort=email&order={% if sort=='email' %}{{ next_order }}{% else %}asc{% endif %}" style="color:#555;text-decoration:none;">Email {% if sort=='email' %}{% if order=='asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
+      <th><a href="?sort=company_name&order={% if sort=='company_name' %}{{ next_order }}{% else %}asc{% endif %}" style="color:#555;text-decoration:none;">Company {% if sort=='company_name' %}{% if order=='asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
+      <th><a href="?sort=sector&order={% if sort=='sector' %}{{ next_order }}{% else %}asc{% endif %}" style="color:#555;text-decoration:none;">Sector {% if sort=='sector' %}{% if order=='asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
+      <th><a href="?sort=validation_status&order={% if sort=='validation_status' %}{{ next_order }}{% else %}asc{% endif %}" style="color:#555;text-decoration:none;">Validation {% if sort=='validation_status' %}{% if order=='asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
+      <th><a href="?sort=send_status&order={% if sort=='send_status' %}{{ next_order }}{% else %}asc{% endif %}" style="color:#555;text-decoration:none;">Send Status {% if sort=='send_status' %}{% if order=='asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
+    </tr></thead>
     <tbody>
-      {% for r in recipients %}
-      <tr>
-        <td><strong>{{ r.first_name or '' }} {{ r.last_name or '' }}</strong></td>
+      {% for r in recipients %}<tr style="border-bottom:1px solid #eee;">
+        <td><strong>{{ r.last_name or '' }}, {{ r.first_name or '' }}</strong></td>
         <td><small>{{ r.email or '-' }}</small></td>
         <td>{{ r.company_name or '-' }}</td>
         <td>{{ r.sector or '-' }}</td>
-        <td>
-          {% if r.validation_status == 'valid' %}<span class="badge badge-done">valid</span>
-          {% elif r.validation_status == 'invalid' %}<span class="badge badge-danger">invalid</span>
-          {% elif r.validation_status == 'catch_all' %}<span class="badge badge-research">catch-all</span>
-          {% else %}<span class="badge">pending</span>{% endif %}
-        </td>
-        <td>
-          {% if r.send_status == 'sent' %}<span class="badge badge-done">sent</span>
-          {% elif r.send_status == 'opened' %}<span class="badge badge-done">opened</span>
-          {% elif r.send_status == 'bounced' %}<span class="badge badge-danger">bounced</span>
-          {% elif r.send_status == 'delivered' %}<span class="badge badge-done">delivered</span>
-          {% else %}<span class="badge">pending</span>{% endif %}
-        </td>
-      </tr>
-      {% endfor %}
-      {% if not recipients %}
-      <tr><td colspan="6" style="text-align:center;padding:2rem;color:#888;">No recipients yet.</td></tr>
-      {% endif %}
+        <td>{% if r.validation_status == 'valid' %}<span class="badge badge-done">valid</span>{% elif r.validation_status == 'invalid' %}<span class="badge badge-danger">invalid</span>{% elif r.validation_status == 'catch_all' %}<span class="badge badge-research">catch-all</span>{% else %}<span class="badge">pending</span>{% endif %}</td>
+        <td>{% if r.send_status == 'sent' %}<span class="badge badge-done">sent</span>{% elif r.send_status == 'opened' %}<span class="badge badge-done">opened</span>{% elif r.send_status == 'bounced' %}<span class="badge badge-danger">bounced</span>{% elif r.send_status == 'delivered' %}<span class="badge badge-done">delivered</span>{% else %}<span class="badge">pending</span>{% endif %}</td>
+      </tr>{% endfor %}
     </tbody>
   </table>
-
   {% if total_pages > 1 %}
-  <div style="margin-top:0.75rem;display:flex;justify-content:center;align-items:center;gap:0.5rem;flex-wrap:wrap;">
-    {% if page > 1 %}
-    <a class="btn btn-outline btn-sm" href="?page=1&sort={{ sort }}&order={{ order }}">&laquo; First</a>
-    <a class="btn btn-outline btn-sm" href="?page={{ page-1 }}&sort={{ sort }}&order={{ order }}">Prev</a>
-    {% endif %}
-    <span style="color:#666;font-size:0.85rem;">Page {{ page }} of {{ total_pages }}</span>
-    {% if page < total_pages %}
-    <a class="btn btn-outline btn-sm" href="?page={{ page+1 }}&sort={{ sort }}&order={{ order }}">Next</a>
-    <a class="btn btn-outline btn-sm" href="?page={{ total_pages }}&sort={{ sort }}&order={{ order }}">Last &raquo;</a>
-    {% endif %}
+  <div style="margin-top:1rem;display:flex;justify-content:center;align-items:center;gap:0.4rem;flex-wrap:wrap;padding:0.5rem;background:#f8f9fa;border-radius:6px;">
+    {% if page > 1 %}<a href="?page=1&sort={{ sort }}&order={{ order }}" class="btn btn-outline btn-sm">&laquo; First</a><a href="?page={{ page-1 }}&sort={{ sort }}&order={{ order }}" class="btn btn-outline btn-sm">&lsaquo; Prev</a>{% endif %}
+    <span style="font-weight:600;color:#333;font-size:0.85rem;">Page {{ page }} of {{ total_pages }}</span>
+    {% if page < total_pages %}<a href="?page={{ page+1 }}&sort={{ sort }}&order={{ order }}" class="btn btn-outline btn-sm">Next &rsaquo;</a><a href="?page={{ total_pages }}&sort={{ sort }}&order={{ order }}" class="btn btn-outline btn-sm">Last &raquo;</a>{% endif %}
   </div>
   {% endif %}
 </div>
