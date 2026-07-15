@@ -10,7 +10,14 @@
 </form>
 <div class="card">
 <table>
-<thead><tr><th>Name</th><th>Company</th><th>Role</th><th>Email</th><th>Research</th><th>Actions</th></tr></thead>
+<thead><tr>
+  <th><a href="?q={{ query }}&sort=first_name&order={% if sort=='first_name' and order=='asc' %}desc{% else %}asc{% endif %}">Name {% if sort=='first_name' %}{% if order=='asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
+  <th>Company</th>
+  <th><a href="?q={{ query }}&sort=role&order={% if sort=='role' and order=='asc' %}desc{% else %}asc{% endif %}">Role {% if sort=='role' %}{% if order=='asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
+  <th><a href="?q={{ query }}&sort=email&order={% if sort=='email' and order=='asc' %}desc{% else %}asc{% endif %}">Email {% if sort=='email' %}{% if order=='asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
+  <th>Research</th>
+  <th>Actions</th>
+</tr></thead>
 <tbody>
 {% for c in contacts %}
 <tr>
@@ -30,5 +37,13 @@
 {% endfor %}
 </tbody></table>
 {% if not contacts %}<p style="text-align:center;padding:2rem;color:#888">No contacts found.</p>{% endif %}
+
+{% if total_pages > 1 %}
+<div class="pagination">
+  {% if page > 1 %}<a href="?q={{ query }}&sort={{ sort }}&order={{ order }}&page={{ page-1 }}">← Prev</a>{% else %}<span class="disabled">← Prev</span>{% endif %}
+  <span class="current">{{ page }} / {{ total_pages }}</span>
+  {% if page < total_pages %}<a href="?q={{ query }}&sort={{ sort }}&order={{ order }}&page={{ page+1 }}">Next →</a>{% else %}<span class="disabled">Next →</span>{% endif %}
+</div>
+{% endif %}
 </div>
 {% endblock %}

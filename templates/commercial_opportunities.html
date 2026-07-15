@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 style="margin-bottom:0.5rem">🎯 Commercial Opportunities</h2>
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem">
+  <a href="/commercial/opportunities/add" class="btn btn-primary">+ Add Opportunity</a>
+  <a href="/commercial/outreach" class="btn btn-outline">← Back to Outreach</a>
+</div>
+
+<div class="search-box">
+  <form method="GET" action="/commercial/opportunities" style="display:flex; width:100%; gap:0.5rem">
+    <input type="text" name="q" value="{{ query }}" placeholder="Search by name..." style="flex:1">
+    <select name="phase" onchange="this.form.submit()" style="width:auto">
+      <option value="">All Phases</option>
+      {% for p in phases %}
+      <option value="{{ p.phase }}" {% if phase == p.phase %}selected{% endif %}>{{ p.phase }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="btn btn-primary">Search</button>
+  </form>
+</div>
+
+<div class="card">
+  <p style="margin-bottom:0.5rem; color:#888; font-size:0.85rem">{{ total }} opportunities</p>
+  <table>
+    <thead>
+      <tr>
+        <th>Opportunity</th><th>Company</th><th>Value</th><th>Service Type</th><th>Phase</th><th>Prob</th><th>Est. Award</th><th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for o in opportunities %}
+      <tr>
+        <td><strong>{{ o.opportunity_name }}</strong></td>
+        <td>{{ o.company_name or '—' }}</td>
+        <td>{% if o.contract_value %}${{ '{:,.0f}'.format(o.contract_value) }}{% else %}—{% endif %}</td>
+        <td>{{ o.service_type or '—' }}</td>
+        <td><span class="badge {% if o.phase == 'Awarded' %}badge-done{% elif o.phase == 'Lost' %}badge-research{% endif %}">{{ o.phase or '—' }}</span></td>
+        <td>{{ o.probability }}%</td>
+        <td>{{ o.estimated_award or '—' }}</td>
+        <td class="actions">
+          <a href="/commercial/opportunities/{{ o.id }}/edit" class="btn btn-sm btn-outline">Edit</a>
+          <form method="POST" action="/commercial/opportunities/{{ o.id }}/delete" style="display:inline" onsubmit="return confirm('Delete this opportunity?')">
+            <button class="btn btn-sm btn-danger">Del</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8" style="text-align:center;color:#888;padding:2rem">No opportunities yet. <a href="/commercial/opportunities/add">Add your first opportunity</a>.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if total_pages > 1 %}
+  <div class="pagination">
+    {% if page > 1 %}<a href="?q={{ query }}&phase={{ phase }}&page={{ page-1 }}">← Prev</a>{% else %}<span class="disabled">← Prev</span>{% endif %}
+    <span class="current">Page {{ page }} of {{ total_pages }}</span>
+    {% if page < total_pages %}<a href="?q={{ query }}&phase={{ phase }}&page={{ page+1 }}">Next →</a>{% else %}<span class="disabled">Next →</span>{% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

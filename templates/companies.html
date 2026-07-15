@@ -9,8 +9,19 @@
     <button type="submit" class="btn btn-primary">Search</button>
 </form>
 <div class="card">
+{% if total_pages > 1 %}
+{% set base_url = '?q=' + (query or '') + '&sort=' + sort + '&order=' + order %}
+{% else %}
+{% set base_url = '?q=' + (query or '') + '&sort=' + sort + '&order=' + order %}
+{% endif %}
 <table>
-<thead><tr><th>Name</th><th>Sector</th><th>Region</th><th>Contacts</th><th>Actions</th></tr></thead>
+<thead><tr>
+  <th><a href="?q={{ query }}&sort=name&order={% if sort=='name' and order=='asc' %}desc{% else %}asc{% endif %}">Name {% if sort=='name' %}{% if order=='asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
+  <th><a href="?q={{ query }}&sort=sector&order={% if sort=='sector' and order=='asc' %}desc{% else %}asc{% endif %}">Sector {% if sort=='sector' %}{% if order=='asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
+  <th><a href="?q={{ query }}&sort=region&order={% if sort=='region' and order=='asc' %}desc{% else %}asc{% endif %}">Region {% if sort=='region' %}{% if order=='asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
+  <th>Contacts</th>
+  <th>Actions</th>
+</tr></thead>
 <tbody>
 {% for c in companies %}
 <tr>
@@ -29,5 +40,13 @@
 {% endfor %}
 </tbody></table>
 {% if not companies %}<p style="text-align:center;padding:2rem;color:#888">No companies found.</p>{% endif %}
+
+{% if total_pages > 1 %}
+<div class="pagination">
+  {% if page > 1 %}<a href="?q={{ query }}&sort={{ sort }}&order={{ order }}&page={{ page-1 }}">← Prev</a>{% else %}<span class="disabled">← Prev</span>{% endif %}
+  <span class="current">{{ page }} / {{ total_pages }}</span>
+  {% if page < total_pages %}<a href="?q={{ query }}&sort={{ sort }}&order={{ order }}&page={{ page+1 }}">Next →</a>{% else %}<span class="disabled">Next →</span>{% endif %}
+</div>
+{% endif %}
 </div>
 {% endblock %}

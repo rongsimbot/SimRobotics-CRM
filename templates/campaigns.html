@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem;">
+  <h2 style="margin:0;">📧 Email Campaigns</h2>
+  <a href="/marketing/campaigns/add" class="btn btn-primary">+ New Campaign</a>
+</div>
+
+<!-- Summary stats -->
+<div class="stats">
+  <div class="stat">
+    <div class="num">{{ stats.total_campaigns }}</div>
+    <div class="label">Campaigns</div>
+  </div>
+  <div class="stat">
+    <div class="num">{{ stats.total_sent }}</div>
+    <div class="label">Emails Sent</div>
+  </div>
+  <div class="stat">
+    <div class="num">{{ stats.total_opened }}</div>
+    <div class="label">Opens</div>
+  </div>
+  <div class="stat">
+    <div class="num">{{ "%.1f"|format(stats.open_rate if stats.total_sent > 0 else 0) }}%</div>
+    <div class="label">Open Rate</div>
+  </div>
+</div>
+
+<!-- Campaign list -->
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th>Campaign</th>
+        <th>Status</th>
+        <th>Audience</th>
+        <th>Sent</th>
+        <th>Opens</th>
+        <th>Clicks</th>
+        <th>Bounces</th>
+        <th>Unsubs</th>
+        <th>Open %</th>
+        <th>Created</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in campaigns %}
+      <tr>
+        <td>
+          <a href="/marketing/campaigns/{{ c.id }}" style="color:#1a1a2e;text-decoration:none;font-weight:600;">
+            {{ c.name }}
+          </a>
+          {% if c.subject_line %}<br><small style="color:#888;">{{ c.subject_line[:60] }}{% if c.subject_line|length > 60 %}…{% endif %}</small>{% endif %}
+        </td>
+        <td>
+          <span class="badge {% if c.status == 'draft' %}badge-research{% elif c.status == 'sent' or c.status == 'completed' %}badge-done{% else %}badge-research{% endif %}">
+            {{ c.status|capitalize }}
+          </span>
+        </td>
+        <td><span style="font-size:0.8rem;">{{ c.audience_type|capitalize }}</span></td>
+        <td>{{ c.total_recipients }}</td>
+        <td>{{ c.total_opened }}</td>
+        <td>{{ c.total_clicked }}</td>
+        <td>{{ c.total_bounced }}</td>
+        <td>{{ c.total_unsubscribed }}</td>
+        <td>
+          {% if c.total_recipients > 0 %}
+          <strong>{{ "%.1f"|format(c.total_opened / c.total_recipients * 100) }}%</strong>
+          {% else %}-{% endif %}
+        </td>
+        <td><small>{{ c.created_at.strftime('%Y-%m-%d') if c.created_at else '-' }}</small></td>
+        <td>
+          <div class="actions">
+            <a href="/marketing/campaigns/{{ c.id }}" class="btn btn-outline btn-sm">View</a>
+            <form method="POST" action="/marketing/campaigns/{{ c.id }}/delete" style="display:inline;" onsubmit="return confirm('Delete this campaign?');">
+              <button type="submit" class="btn btn-danger btn-sm">×</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+      {% if not campaigns %}
+      <tr><td colspan="11" style="text-align:center;padding:2rem;color:#888;">No campaigns yet. <a href="/marketing/campaigns/add">Create your first campaign</a>.</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+
+{% if campaigns %}
+<div style="margin-top:1.5rem;">
+  <canvas id="overviewChart" style="max-height:300px;"></canvas>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if campaigns %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+(function() {
+  const ctx = document.getElementById('overviewChart');
+  if (!ctx) return;
+  const campaigns = {{ campaigns_json|safe }};
+  const labels = campaigns.map(c => c.name.length > 25 ? c.name.slice(0,25)+'…' : c.name);
+  const opens = campaigns.map(c => c.total_opened || 0);
+  const clicks = campaigns.map(c => c.total_clicked || 0);
+  const bounces = campaigns.map(c => c.total_bounced || 0);
+  const unsubs = campaigns.map(c => c.total_unsubscribed || 0);
+  const unsent = campaigns.map(c => Math.max(0, (c.total_recipients||0) - (c.total_opened||0) - (c.total_bounced||0)));
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        { label: 'Opened', data: opens, backgroundColor: '#00d4aa' },
+        { label: 'Clicked', data: clicks, backgroundColor: '#00b894' },
+        { label: 'Unsent/Unopened', data: unsent, backgroundColor: '#dfe6e9' },
+        { label: 'Bounced', data: bounces, backgroundColor: '#ff7675' },
+        { label: 'Unsubscribed', data: unsubs, backgroundColor: '#fab1a0' }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { position: 'bottom' } },
+      scales: { x: { stacked: true }, y: { stacked: true, title: { display: true, text: 'Recipients' } } }
+    }
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

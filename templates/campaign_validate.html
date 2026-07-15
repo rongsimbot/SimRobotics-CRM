@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 style="margin-bottom:0.5rem">🔍 Validate Emails — {{ campaign.name }}</h2>
+
+<div class="card" style="margin-bottom:1rem">
+  <h3>Validation Status</h3>
+  <div style="display:flex;gap:1rem;margin-top:0.5rem;flex-wrap:wrap">
+    <div style="flex:1;min-width:100px;text-align:center;padding:1rem;background:#f8f9fa;border-radius:8px">
+      <div style="font-size:1.5rem;font-weight:bold;color:#888">{{ unvalidated }}</div>
+      <small>Unvalidated</small>
+    </div>
+    <div style="flex:1;min-width:100px;text-align:center;padding:1rem;background:#e8f8f0;border-radius:8px">
+      <div style="font-size:1.5rem;font-weight:bold;color:#27ae60">{{ already_valid }}</div>
+      <small>Valid ✓</small>
+    </div>
+    <div style="flex:1;min-width:100px;text-align:center;padding:1rem;background:#fde8e8;border-radius:8px">
+      <div style="font-size:1.5rem;font-weight:bold;color:#e74c3c">{{ already_invalid }}</div>
+      <small>Invalid ✗</small>
+    </div>
+  </div>
+</div>
+
+{% if unvalidated > 0 %}
+<div class="card">
+  <h3 style="margin-bottom:0.5rem">Run Validation</h3>
+  <p style="color:#888;margin-bottom:0.5rem">
+    ZeroBounce validates deliverability. Each validation costs 1 credit.
+    {% if credits.Credits %}<strong>{{ credits.Credits }} credits available.</strong>{% endif %}
+  </p>
+  <form method="POST" onsubmit="return confirm('Validate {{ unvalidated }} emails? This will consume {{ unvalidated }} ZeroBounce credits.')">
+    <button type="submit" class="btn btn-primary" style="background:#0a84ff">🔍 Validate {{ unvalidated }} Emails</button>
+  </form>
+</div>
+{% else %}
+<div class="card">
+  <p style="color:#27ae60">✅ All recipients validated. 
+    {% if already_invalid > 0 %}{{ already_invalid }} invalid — these will be skipped when sending.{% endif %}
+  </p>
+  {% if campaign.status == 'ready' %}
+    <a href="/commercial/campaigns/{{ campaign.id }}/send" class="btn btn-primary" style="margin-top:0.5rem">🚀 Send via Brevo</a>
+  {% endif %}
+</div>
+{% endif %}
+
+<div style="margin-top:1rem">
+  <a href="/commercial/campaigns/{{ campaign.id }}">← Back to Campaign</a>
+</div>
+{% endblock %}

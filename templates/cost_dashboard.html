@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.cost-card { background: #fff; border-radius:8px; padding:1rem; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,0.08); }
+.cost-card .value { font-size:2rem; font-weight:bold; }
+.cost-card .label { color:#888; font-size:0.8rem; margin-top:0.25rem; }
+.cost-positive { color:#27ae60; }
+.cost-warning { color:#f39c12; }
+.cost-danger { color:#e74c3c; }
+.progress-bar { height:8px; background:#eee; border-radius:4px; margin:0.5rem 0; overflow:hidden; }
+.progress-fill { height:100%; border-radius:4px; transition:width 0.3s; }
+</style>
+
+<h2>💰 Cost & Usage Dashboard</h2>
+
+<!-- Summary Cards -->
+<div style="display:flex;gap:1rem;margin-bottom:1rem;flex-wrap:wrap">
+  <div class="cost-card" style="flex:1;min-width:150px">
+    <div class="value" style="color:#888">${{ "%.2f"|format(total_cost) }}</div>
+    <div class="label">Total Spent</div>
+  </div>
+  <div class="cost-card" style="flex:1;min-width:150px">
+    <div class="value" style="color:#27ae60">${{ "%.2f"|format(total_zb_cost) }}</div>
+    <div class="label">ZeroBounce Cost</div>
+  </div>
+  <div class="cost-card" style="flex:1;min-width:150px">
+    <div class="value" style="color:#0a84ff">${{ "%.2f"|format(total_brevo_cost) }}</div>
+    <div class="label">Brevo Cost</div>
+  </div>
+</div>
+
+<!-- ZeroBounce Usage -->
+<div class="card" style="margin-bottom:1rem">
+  <h3 style="margin-bottom:0.5rem">🔍 ZeroBounce Credits</h3>
+  <div style="display:flex;justify-content:space-between;margin-bottom:0.25rem">
+    <span>Used: {{ total_validated }} / {{ total_validated + zb_free_remaining }}</span>
+    <span><strong>{{ zb_free_remaining }}</strong> free credits left</span>
+  </div>
+  <div class="progress-bar">
+    {% set zb_total = total_validated + zb_free_remaining %}
+    {% set zb_pct = (total_validated / zb_total * 100) if zb_total > 0 else 0 %}
+    {% if zb_free_remaining < 20 %}
+      {% set zb_color = '#e74c3c' %}
+    {% elif zb_free_remaining < 50 %}
+      {% set zb_color = '#f39c12' %}
+    {% else %}
+      {% set zb_color = '#27ae60' %}
+    {% endif %}
+    <div class="progress-fill" style="width:{{ zb_pct }}%;background:{{ zb_color }}"></div>
+  </div>
+  <small style="color:#888">Rate: {{ rates.zerobounce_free_credits }} free, then ${{ "%.2f"|format(rates.zerobounce_per_email) }}/email</small>
+</div>
+
+<!-- Brevo Usage -->
+<div class="card" style="margin-bottom:1rem">
+  <h3 style="margin-bottom:0.5rem">📧 Brevo Sends (Monthly)</h3>
+  <div style="display:flex;justify-content:space-between;margin-bottom:0.25rem">
+    <span>Sent: {{ total_sent }} / {{ rates.brevo_monthly_included }}</span>
+    <span><strong>{{ brevo_remaining }}</strong> included sends left</span>
+  </div>
+  <div class="progress-bar">
+    {% set brevo_pct = (total_sent / rates.brevo_monthly_included * 100) if rates.brevo_monthly_included > 0 else 0 %}
+    {% if brevo_remaining < 500 %}
+      {% set brevo_color = '#e74c3c' %}
+    {% elif brevo_remaining < 1000 %}
+      {% set brevo_color = '#f39c12' %}
+    {% else %}
+      {% set brevo_color = '#27ae60' %}
+    {% endif %}
+    <div class="progress-fill" style="width:{{ brevo_pct }}%;background:{{ brevo_color }}"></div>
+  </div>
+  <small style="color:#888">5,000/month included, then ${{ "%.3f"|format(rates.brevo_overage_per_email) }}/email</small>
+</div>
+
+<!-- Campaign Cost Breakdown -->
+<div class="card">
+  <h3 style="margin-bottom:0.5rem">📊 Campaign Cost Breakdown</h3>
+  <table><thead><tr>
+    <th>Campaign</th><th>Contacts</th><th>Validated</th><th>Sent</th><th>ZB Cost</th><th>Brevo Cost</th><th>Total</th><th>Status</th>
+  </tr></thead><tbody>
+    {% for c in campaigns %}<tr>
+      <td><a href="/commercial/campaigns/{{ c.id }}/cost"><strong>{{ c.name }}</strong></a></td>
+      <td>{{ c.total_contacts }}</td>
+      <td>{{ c.total_validated }}</td>
+      <td>{{ c.total_sent }}</td>
+      <td class="{% if c.validation_cost and c.validation_cost > 0 %}cost-positive{% endif %}">${{ "%.2f"|format(c.validation_cost or 0) }}</td>
+      <td class="{% if c.sending_cost and c.sending_cost > 0 %}cost-positive{% endif %}">${{ "%.2f"|format(c.sending_cost or 0) }}</td>
+      <td><strong>${{ "%.2f"|format(c.total_cost or 0) }}</strong></td>
+      <td><span class="badge {% if c.status=='sent' %}badge-done{% elif c.status=='draft' %}badge-research{% endif %}">{{ c.status }}</span></td>
+    </tr>{% else %}
+    <tr><td colspan="8" style="text-align:center;color:#888;padding:2rem">No campaigns yet.</td></tr>{% endfor %}
+  </tbody></table>
+</div>
+{% endblock %}

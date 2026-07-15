@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 style="margin-bottom:0.5rem">📊 Commercial Outreach & Planning</h2>
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem">
+  <a href="/commercial/outreach/add" class="btn btn-primary">+ Log Outreach</a>
+  <a href="/commercial/opportunities/add" class="btn btn-outline">+ Add Opportunity</a>
+</div>
+
+<div class="search-box">
+  <form method="GET" action="/commercial/outreach" style="display:flex; width:100%; gap:0.5rem; flex-wrap:wrap">
+    <select name="sector" style="width:auto">
+      <option value="">All Sectors</option>
+      {% for s in sectors %}<option value="{{ s.sector }}" {% if sector_filter==s.sector %}selected{% endif %}>{{ s.sector }}</option>{% endfor %}
+    </select>
+    <select name="is_customer" style="width:auto">
+      <option value="">All Customers</option>
+      <option value="yes" {% if is_customer_filter=='yes' %}selected{% endif %}>Existing Customers</option>
+      <option value="no" {% if is_customer_filter=='no' %}selected{% endif %}>Not Customers</option>
+    </select>
+    <input type="text" name="q" value="{{ query }}" placeholder="Search by subject or notes..." style="flex:1; min-width:200px">
+    <select name="status" style="width:auto">
+      <option value="">All Status</option>
+      {% for s in statuses %}<option value="{{ s.status }}" {% if status==s.status %}selected{% endif %}>{{ s.status }}</option>{% endfor %}
+    </select>
+    <button type="submit" class="btn btn-primary">Search</button>
+  </form>
+</div>
+
+<div class="card">
+  <p style="margin-bottom:0.5rem; color:#888; font-size:0.85rem">{{ total }} outreach records</p>
+  <table><thead><tr>
+    <th><a href="?q={{ query }}&status={{ status }}&sector={{ sector_filter }}&is_customer={{ is_customer_filter }}&sort=outreach_date&order={% if sort=='outreach_date' and order=='asc' %}desc{% else %}asc{% endif %}">Date {% if sort=='outreach_date' %}{% if order=='asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th><th>Company</th><th>Contact</th>
+    <th><a href="?q={{ query }}&status={{ status }}&sector={{ sector_filter }}&is_customer={{ is_customer_filter }}&sort=subject&order={% if sort=='subject' and order=='asc' %}desc{% else %}asc{% endif %}">Subject {% if sort=='subject' %}{% if order=='asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
+    <th>Response</th><th>Next Action</th>
+    <th><a href="?q={{ query }}&status={{ status }}&sector={{ sector_filter }}&is_customer={{ is_customer_filter }}&sort=status&order={% if sort=='status' and order=='asc' %}desc{% else %}asc{% endif %}">Status {% if sort=='status' %}{% if order=='asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th><th>Actions</th>
+  </tr></thead><tbody>
+    {% for r in outreach_records %}<tr>
+      <td>{{ r.outreach_date or '—' }}</td>
+      <td>{{ r.company_name or '—' }}</td>
+      <td>{{ r.contact_name or '—' }}</td>
+      <td>{{ r.subject or '—' }}</td>
+      <td><small>{{ r.response or '—' }}</small></td>
+      <td>{{ r.next_action or '—' }}{% if r.follow_up_date %}<br><small>{{ r.follow_up_date }}</small>{% endif %}</td>
+      <td><span class="badge {% if r.status in ('Won','Response Received') %}badge-done{% elif r.status in ('Lost','Archived') %}badge-research{% endif %}">{{ r.status }}</span></td>
+      <td class="actions">
+        <a href="/commercial/outreach/{{ r.id }}/edit" class="btn btn-sm btn-outline">Edit</a>
+        <form method="POST" action="/commercial/outreach/{{ r.id }}/delete" style="display:inline" onsubmit="return confirm('Delete?')"><button class="btn btn-sm btn-danger">Del</button></form>
+      </td>
+    </tr>{% else %}
+    <tr><td colspan="8" style="text-align:center;color:#888;padding:2rem">No records yet.</td></tr>{% endfor %}
+  </tbody></table>
+  {% if total_pages > 1 %}<div class="pagination">
+    {% if page > 1 %}<a href="?q={{ query }}&status={{ status }}&sector={{ sector_filter }}&is_customer={{ is_customer_filter }}&page={{ page-1 }}">←</a>{% else %}<span class="disabled">←</span>{% endif %}
+    <span class="current">{{ page }}/{{ total_pages }}</span>
+    {% if page < total_pages %}<a href="?q={{ query }}&status={{ status }}&sector={{ sector_filter }}&is_customer={{ is_customer_filter }}&page={{ page+1 }}">→</a>{% else %}<span class="disabled">→</span>{% endif %}
+  </div>{% endif %}
+</div>
+{% endblock %}

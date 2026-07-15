@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Log Email Send — {{ campaign.name }}</h2>
+
+<form method="POST" class="card">
+  <div class="form-row">
+    <div>
+      <label>Recipient Name</label>
+      <input type="text" name="recipient_name" value="{{ send.recipient_name if send else '' }}">
+    </div>
+    <div>
+      <label>Recipient Email *</label>
+      <input type="email" name="recipient_email" value="{{ send.recipient_email if send else '' }}" required>
+    </div>
+  </div>
+  <div class="form-row">
+    <div>
+      <label>Contact Type *</label>
+      <select name="contact_type" required>
+        <option value="commercial" {% if send and send.contact_type == 'commercial' %}selected{% endif %}>Commercial</option>
+        <option value="military" {% if send and send.contact_type == 'military' %}selected{% endif %}>Military</option>
+      </select>
+    </div>
+    <div>
+      <label>Link to Company (commercial)</label>
+      <select name="company_id">
+        <option value="">-- None --</option>
+        {% for c in companies %}
+        <option value="{{ c.id }}" {% if send and send.company_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+  <div class="form-row">
+    <div>
+      <label>Link to Military Base</label>
+      <select name="military_base_id">
+        <option value="">-- None --</option>
+        {% for b in bases %}
+        <option value="{{ b.id }}" {% if send and send.military_base_id == b.id %}selected{% endif %}>{{ b.base_name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label>Sent Date</label>
+      <input type="datetime-local" name="sent_at" value="{{ send.sent_at.strftime('%Y-%m-%dT%H:%M') if send and send.sent_at else '' }}">
+    </div>
+  </div>
+  <div class="form-row">
+    <div>
+      <label>Opened At</label>
+      <input type="datetime-local" name="opened_at" value="{{ send.opened_at.strftime('%Y-%m-%dT%H:%M') if send and send.opened_at else '' }}">
+    </div>
+    <div>
+      <label>Clicked At</label>
+      <input type="datetime-local" name="clicked_at" value="{{ send.clicked_at.strftime('%Y-%m-%dT%H:%M') if send and send.clicked_at else '' }}">
+    </div>
+  </div>
+  <div class="form-row">
+    <div>
+      <label style="display:flex;align-items:center;gap:0.5rem;">
+        <input type="checkbox" name="bounced" value="1" {% if send and send.bounced %}checked{% endif %} style="width:auto;">
+        Bounced
+      </label>
+    </div>
+    <div>
+      <label style="display:flex;align-items:center;gap:0.5rem;">
+        <input type="checkbox" name="unsubscribed" value="1" {% if send and send.unsubscribed %}checked{% endif %} style="width:auto;">
+        Unsubscribed
+      </label>
+    </div>
+  </div>
+
+  <div style="margin-top:1.5rem;display:flex;gap:0.5rem;">
+    <button type="submit" class="btn btn-primary">{% if send %}Save Changes{% else %}Log Send{% endif %}</button>
+    <a href="/marketing/campaigns/{{ campaign.id }}" class="btn btn-outline">Cancel</a>
+  </div>
+</form>
+{% endblock %}

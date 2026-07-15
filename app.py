@@ -19,6 +19,7 @@ ALLOWED_SORT_COLS = {
     'military_bases': ['base_name', 'branch', 'state', 'city', 'command_name', 'contact_count', 'status', 'priority'],
     'military_contacts': ['contact_name', 'title', 'contact_role', 'email', 'phone'],
     'military_outreach': ['outreach_date', 'subject', 'status', 'channel'],
+    'commercial_outreach': ['outreach_date', 'subject', 'status', 'channel'],
 }
 
 def get_db():
@@ -154,6 +155,94 @@ def interaction_add(id):
     if not contact: flash('Contact not found', 'error'); return redirect('/contacts')
     if request.method == 'POST': query("INSERT INTO interactions (contact_id, interaction_date, channel, notes, next_action) VALUES (%s,%s,%s,%s,%s)", (id, request.form.get('interaction_date') or None, request.form.get('channel','') or None, request.form.get('notes','') or None, request.form.get('next_action','') or None)); flash('Interaction logged!', 'success'); return redirect(f'/contacts/{id}')
     return render_template('interaction_form.html', contact=contact, section='commercial', active_page='contacts')
+
+# ── Commercial Outreach ─────────────────────────────────────────
+
+@app.route('/commercial/outreach')
+def commercial_outreach_list():
+    q = request.args.get('q', ''); status = request.args.get('status', '')
+    sector_filter = request.args.get('sector', ''); is_customer_filter = request.args.get('is_customer', '')
+    page = int(request.args.get('page', 1))
+    sort = request.args.get('sort', 'outreach_date'); order = request.args.get('order', 'desc')
+    where_parts = ["1=1"]; params = []
+    if q: where_parts.append("(mo.subject ILIKE %s OR mo.notes ILIKE %s)"); params.extend([f'%{q}%']*2)
+    if status: where_parts.append("mo.status = %s"); params.append(status)
+    if sector_filter: where_parts.append("c.sector = %s"); params.append(sector_filter)
+    if is_customer_filter == 'yes': where_parts.append("c.is_existing_customer = true")
+    if is_customer_filter == 'no': where_parts.append("(c.is_existing_customer = false OR c.is_existing_customer IS NULL)")
+    w = " AND ".join(where_parts)
+    if sort not in ALLOWED_SORT_COLS.get('commercial_outreach', []) or order not in ('asc', 'desc'):
+        sort = 'outreach_date'; order = 'desc'
+    base_sql = f"SELECT mo.*, c.name as company_name, ct.first_name || ' ' || ct.last_name as contact_name FROM commercial_outreach mo LEFT JOIN companies c ON mo.company_id = c.id LEFT JOIN contacts ct ON mo.contact_id = ct.id WHERE {w}"
+    count_sql = f"SELECT count(*) FROM commercial_outreach mo LEFT JOIN companies c ON mo.company_id = c.id WHERE {w}"
+    total = query_val(count_sql, tuple(params)); total_pages = max(1, math.ceil(total / PAGE_SIZE)); page = min(page, total_pages)
+    offset = (page - 1) * PAGE_SIZE
+    rows = query(base_sql + f" ORDER BY {sort} {order} NULLS LAST LIMIT {PAGE_SIZE} OFFSET {offset}", tuple(params))
+    statuses = query("SELECT DISTINCT status FROM commercial_outreach ORDER BY status")
+    sectors = query("SELECT DISTINCT sector FROM companies WHERE sector IS NOT NULL ORDER BY sector")
+    return render_template('commercial_outreach.html', outreach_records=rows, query=q, status=status, statuses=statuses, sectors=sectors, sector_filter=sector_filter, is_customer_filter=is_customer_filter, page=page, total_pages=total_pages, total=total, sort=sort, order=order, section='commercial', active_page='commercial_outreach')
+
+@app.route('/commercial/outreach/add', methods=['GET', 'POST'])
+@app.route('/commercial/outreach/<int:id>/edit', methods=['GET', 'POST'])
+def commercial_outreach_form(id=None):
+    record = query_one("SELECT * FROM commercial_outreach WHERE id=%s", (id,)) if id else None
+    if id and not record: flash('Outreach record not found', 'error'); return redirect('/commercial/outreach')
+    if request.method == 'POST':
+        f = [request.form.get('company_id') or None, request.form.get('contact_id') or None, request.form.get('outreach_date') or None, request.form.get('channel','') or None, request.form.get('subject','') or None, request.form.get('response','') or None, request.form.get('follow_up_date') or None, request.form.get('status','Not Contacted'), request.form.get('notes','') or None, request.form.get('next_action','') or None]
+        cols = "company_id,contact_id,outreach_date,channel,subject,response,follow_up_date,status,notes,next_action"
+        if id:
+            f.append(id)
+            query(f"UPDATE commercial_outreach SET {','.join(c+'=%s' for c in cols.split(','))} WHERE id=%s", f)
+        else:
+            query(f"INSERT INTO commercial_outreach ({cols}) VALUES ({','.join('%s' for _ in f)})", f)
+        flash('Outreach record saved!', 'success'); return redirect('/commercial/outreach')
+    companies = query("SELECT id, name FROM companies ORDER BY name")
+    contacts = query("SELECT id, first_name || ' ' || last_name as display_name FROM contacts ORDER BY first_name, last_name")
+    sl = ['Not Contacted','Contacted','Response Received','Won','Lost','Archived','Plan Phase']
+    channels = ['Email','Phone','In-Person','Video Conference','Conference','Site Visit','LinkedIn']
+    return render_template('commercial_outreach_form.html', record=record, all_companies=companies, all_contacts=contacts, statuses=sl, channels=channels, section='commercial', active_page='commercial_outreach')
+
+@app.route('/commercial/outreach/<int:id>/delete', methods=['POST'])
+def commercial_outreach_delete(id): query("DELETE FROM commercial_outreach WHERE id=%s", (id,)); flash('Outreach record deleted.', 'success'); return redirect('/commercial/outreach')
+
+# ── Commercial Opportunities ─────────────────────────────────────
+
+@app.route('/commercial/opportunities')
+def commercial_opportunities_list():
+    q = request.args.get('q', ''); phase = request.args.get('phase', '')
+    page = int(request.args.get('page', 1))
+    where_parts = ["1=1"]; params = []
+    if q: where_parts.append("(mo.opportunity_name ILIKE %s)"); params.append(f'%{q}%')
+    if phase: where_parts.append("mo.phase = %s"); params.append(phase)
+    w = " AND ".join(where_parts)
+    base_sql = f"SELECT mo.*, c.name as company_name FROM commercial_opportunities mo LEFT JOIN companies c ON mo.company_id = c.id WHERE {w}"
+    count_sql = f"SELECT count(*) FROM commercial_opportunities mo WHERE {w}"
+    total = query_val(count_sql, tuple(params)); total_pages = max(1, math.ceil(total / PAGE_SIZE)); page = min(page, total_pages)
+    offset = (page - 1) * PAGE_SIZE
+    rows = query(base_sql + f" ORDER BY mo.created_at DESC LIMIT {PAGE_SIZE} OFFSET {offset}", tuple(params))
+    phases = query("SELECT DISTINCT phase FROM commercial_opportunities WHERE phase IS NOT NULL ORDER BY phase")
+    return render_template('commercial_opportunities.html', opportunities=rows, query=q, phase=phase, phases=phases, page=page, total_pages=total_pages, total=total, section='commercial', active_page='commercial_outreach')
+
+@app.route('/commercial/opportunities/add', methods=['GET', 'POST'])
+@app.route('/commercial/opportunities/<int:id>/edit', methods=['GET', 'POST'])
+def commercial_opportunity_form(id=None):
+    opp = query_one("SELECT * FROM commercial_opportunities WHERE id=%s", (id,)) if id else None
+    if id and not opp: flash('Opportunity not found', 'error'); return redirect('/commercial/opportunities')
+    if request.method == 'POST':
+        f = [request.form.get('company_id') or None, request.form['opportunity_name'], request.form.get('contract_value') or None, request.form.get('phase','') or None, request.form.get('estimated_award') or None, int(request.form.get('probability', 0)), request.form.get('service_type','') or None, request.form.get('notes','') or None]
+        cols = "company_id,opportunity_name,contract_value,phase,estimated_award,probability,service_type,notes"
+        if id:
+            f.append(id)
+            query(f"UPDATE commercial_opportunities SET {','.join(c+'=%s' for c in cols.split(','))} WHERE id=%s", f)
+        else:
+            query(f"INSERT INTO commercial_opportunities ({cols}) VALUES ({','.join('%s' for _ in f)})", f)
+        flash('Opportunity saved!', 'success'); return redirect('/commercial/opportunities')
+    companies = query("SELECT id, name FROM companies ORDER BY name")
+    pl = ['Identification','Qualification','Capture','Proposal','Submitted','Awarded','Lost','Closed']
+    return render_template('commercial_opportunity_form.html', opp=opp, all_companies=companies, phases=pl, section='commercial', active_page='commercial_outreach')
+
+@app.route('/commercial/opportunities/<int:id>/delete', methods=['POST'])
+def commercial_opportunity_delete(id): query("DELETE FROM commercial_opportunities WHERE id=%s", (id,)); flash('Opportunity deleted.', 'success'); return redirect('/commercial/opportunities')
 
 # ── Military ────────────────────────────────────────────────────
 
@@ -358,7 +447,142 @@ def sales_deals(): return placeholder('Deals', 'sales', 'sales_deals')
 @app.route('/sales/quotes')
 def sales_quotes(): return placeholder('Quotes', 'sales', 'sales_quotes')
 @app.route('/marketing/campaigns')
-def marketing_campaigns(): return placeholder('Campaigns', 'marketing', 'marketing_campaigns')
+def marketing_campaigns():
+    stats = {
+        'total_campaigns': query_val("SELECT count(*) FROM email_campaigns"),
+        'total_sent': query_val("SELECT coalesce(sum(total_recipients), 0) FROM email_campaigns"),
+        'total_opened': query_val("SELECT coalesce(sum(total_opened), 0) FROM email_campaigns"),
+    }
+    stats['open_rate'] = stats['total_opened'] / stats['total_sent'] * 100 if stats['total_sent'] > 0 else 0
+    campaigns = query("SELECT * FROM email_campaigns ORDER BY created_at DESC")
+    import json
+    campaigns_json = json.dumps([{
+        'id': c['id'], 'name': c['name'], 'total_recipients': c['total_recipients'] or 0,
+        'total_opened': c['total_opened'] or 0, 'total_clicked': c['total_clicked'] or 0,
+        'total_bounced': c['total_bounced'] or 0, 'total_unsubscribed': c['total_unsubscribed'] or 0
+    } for c in campaigns])
+    return render_template('campaigns.html', stats=stats, campaigns=campaigns, campaigns_json=campaigns_json, section='marketing', active_page='marketing_campaigns')
+
+@app.route('/marketing/campaigns/add', methods=['GET', 'POST'])
+@app.route('/marketing/campaigns/<int:id>/edit', methods=['GET', 'POST'])
+def marketing_campaign_form(id=None):
+    campaign = query_one("SELECT * FROM email_campaigns WHERE id=%s", (id,)) if id else None
+    if id and not campaign: flash('Campaign not found', 'error'); return redirect('/marketing/campaigns')
+    if request.method == 'POST':
+        data = {
+            'name': request.form['name'],
+            'subject_line': request.form.get('subject_line') or None,
+            'sender_email': request.form.get('sender_email') or None,
+            'template_used': request.form.get('template_used') or None,
+            'audience_type': request.form.get('audience_type', 'commercial'),
+            'status': request.form.get('status', 'draft'),
+            'scheduled_at': request.form.get('scheduled_at') or None,
+            'sent_at': request.form.get('sent_at') or None,
+            'total_recipients': int(request.form.get('total_recipients', 0)),
+            'notes': request.form.get('notes') or None,
+        }
+        if id:
+            sets = ', '.join(f"{k}=%s" for k in data)
+            vals = list(data.values()) + [id]
+            query(f"UPDATE email_campaigns SET {sets}, updated_at=CURRENT_TIMESTAMP WHERE id=%s", vals)
+        else:
+            cols = ', '.join(data.keys())
+            phs = ', '.join(['%s'] * len(data))
+            query(f"INSERT INTO email_campaigns ({cols}) VALUES ({phs})", list(data.values()))
+        flash('Campaign saved!', 'success'); return redirect('/marketing/campaigns')
+    return render_template('campaign_form.html', campaign=campaign, section='marketing', active_page='marketing_campaigns')
+
+@app.route('/marketing/campaigns/<int:id>')
+def marketing_campaign_view(id):
+    campaign = query_one("SELECT * FROM email_campaigns WHERE id=%s", (id,))
+    if not campaign: flash('Campaign not found', 'error'); return redirect('/marketing/campaigns')
+    sends = query("""
+        SELECT es.*, c.name as company_name, mb.base_name
+        FROM email_sends es
+        LEFT JOIN companies c ON es.company_id = c.id
+        LEFT JOIN military_bases mb ON es.military_base_id = mb.id
+        WHERE es.campaign_id = %s
+        ORDER BY es.sent_at DESC NULLS LAST
+    """, (id,))
+    import json
+    total = campaign['total_recipients'] or 0
+    opened = campaign['total_opened'] or 0
+    clicked = campaign['total_clicked'] or 0
+    bounced = campaign['total_bounced'] or 0
+    unsub = campaign['total_unsubscribed'] or 0
+    no_eng = max(0, total - opened - bounced - unsub)
+    chart_data = json.dumps({
+        'total': total, 'opened': opened, 'clicked': clicked,
+        'bounced': bounced, 'unsubscribed': unsub, 'no_engagement': no_eng
+    })
+    return render_template('campaign_view.html', campaign=campaign, sends=sends,
+                           chart_data=chart_data, section='marketing', active_page='marketing_campaigns')
+
+@app.route('/marketing/campaigns/<int:id>/delete', methods=['POST'])
+def marketing_campaign_delete(id):
+    query("DELETE FROM email_campaigns WHERE id=%s", (id,))
+    flash('Campaign deleted.', 'success'); return redirect('/marketing/campaigns')
+
+@app.route('/marketing/campaigns/<int:id>/sends/add', methods=['GET', 'POST'])
+def marketing_send_add(id):
+    campaign = query_one("SELECT * FROM email_campaigns WHERE id=%s", (id,))
+    if not campaign: flash('Campaign not found', 'error'); return redirect('/marketing/campaigns')
+    if request.method == 'POST':
+        _save_email_send(id, None)
+        flash('Send logged!', 'success'); return redirect(f'/marketing/campaigns/{id}')
+    companies = query("SELECT id, name FROM companies ORDER BY name")
+    bases = query("SELECT id, base_name FROM military_bases ORDER BY base_name")
+    return render_template('campaign_send_form.html', campaign=campaign, send=None,
+                           companies=companies, bases=bases, section='marketing', active_page='marketing_campaigns')
+
+@app.route('/marketing/campaigns/<int:id>/sends/<int:send_id>/edit', methods=['GET', 'POST'])
+def marketing_send_edit(id, send_id):
+    campaign = query_one("SELECT * FROM email_campaigns WHERE id=%s", (id,))
+    if not campaign: flash('Campaign not found', 'error'); return redirect('/marketing/campaigns')
+    send = query_one("SELECT * FROM email_sends WHERE id=%s", (send_id,))
+    if not send: flash('Send not found', 'error'); return redirect(f'/marketing/campaigns/{id}')
+    if request.method == 'POST':
+        _save_email_send(id, send_id)
+        flash('Send updated!', 'success'); return redirect(f'/marketing/campaigns/{id}')
+    companies = query("SELECT id, name FROM companies ORDER BY name")
+    bases = query("SELECT id, base_name FROM military_bases ORDER BY base_name")
+    return render_template('campaign_send_form.html', campaign=campaign, send=send,
+                           companies=companies, bases=bases, section='marketing', active_page='marketing_campaigns')
+
+def _save_email_send(campaign_id, send_id):
+    data = {
+        'campaign_id': campaign_id,
+        'contact_type': request.form.get('contact_type', 'commercial'),
+        'company_id': request.form.get('company_id') or None,
+        'military_base_id': request.form.get('military_base_id') or None,
+        'recipient_email': request.form.get('recipient_email'),
+        'recipient_name': request.form.get('recipient_name') or None,
+        'sent_at': request.form.get('sent_at') or None,
+        'opened_at': request.form.get('opened_at') or None,
+        'clicked_at': request.form.get('clicked_at') or None,
+        'bounced': request.form.get('bounced') == '1',
+        'unsubscribed': request.form.get('unsubscribed') == '1',
+    }
+    if send_id:
+        sets = ', '.join(f"{k}=%s" for k in data)
+        vals = list(data.values()) + [send_id]
+        query(f"UPDATE email_sends SET {sets} WHERE id=%s", vals)
+    else:
+        cols = ', '.join(data.keys())
+        phs = ', '.join(['%s'] * len(data))
+        query(f"INSERT INTO email_sends ({cols}) VALUES ({phs})", list(data.values()))
+    # Recompute campaign aggregates
+    query("""
+        UPDATE email_campaigns SET
+            total_recipients = (SELECT count(*) FROM email_sends WHERE campaign_id=%s),
+            total_opened = (SELECT count(*) FROM email_sends WHERE campaign_id=%s AND opened_at IS NOT NULL),
+            total_clicked = (SELECT count(*) FROM email_sends WHERE campaign_id=%s AND clicked_at IS NOT NULL),
+            total_bounced = (SELECT count(*) FROM email_sends WHERE campaign_id=%s AND bounced=true),
+            total_unsubscribed = (SELECT count(*) FROM email_sends WHERE campaign_id=%s AND unsubscribed=true),
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id=%s
+    """, (campaign_id, campaign_id, campaign_id, campaign_id, campaign_id, campaign_id))
+
 @app.route('/marketing/leads')
 def marketing_leads(): return placeholder('Leads', 'marketing', 'marketing_leads')
 @app.route('/support/tickets')

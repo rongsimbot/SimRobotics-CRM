@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 style="margin-bottom:0.5rem">{% if record %}Edit Outreach{% else %}Log Outreach{% endif %}</h2>
+<div class="card"><form method="POST">
+<div class="form-row">
+  <div><label>Company</label><select name="company_id"><option value="">— None —</option>
+    {% for c in all_companies %}<option value="{{ c.id }}" {% if record and record.company_id==c.id %}selected{% endif %}>{{ c.name }}</option>{% endfor %}</select></div>
+  <div><label>Contact</label><select name="contact_id"><option value="">— None —</option>
+    {% for c in all_contacts %}<option value="{{ c.id }}" {% if record and record.contact_id==c.id %}selected{% endif %}>{{ c.display_name }}</option>{% endfor %}</select></div>
+</div>
+<div class="form-row">
+  <div><label>Outreach Date</label><input type="date" name="outreach_date" value="{{ record.outreach_date if record else '' }}"></div>
+  <div><label>Channel</label><select name="channel"><option value="">— Select —</option>
+    {% for ch in channels %}<option value="{{ ch }}" {% if record and record.channel==ch %}selected{% endif %}>{{ ch }}</option>{% endfor %}</select></div>
+</div>
+<div class="form-row">
+  <div><label>Status</label><select name="status">
+    {% for s in statuses %}<option value="{{ s }}" {% if record and record.status==s %}selected{% endif %}>{{ s }}</option>{% endfor %}</select></div>
+  <div><label>Follow-Up Date</label><input type="date" name="follow_up_date" value="{{ record.follow_up_date if record else '' }}"></div>
+</div>
+<label>Subject</label><input type="text" name="subject" value="{{ record.subject if record else '' }}" placeholder="e.g. Introduction email — SimRobotics capabilities">
+<label>Response</label><input type="text" name="response" value="{{ record.response if record else '' }}" placeholder="e.g. Positive — requesting capabilities briefing">
+<label>Notes</label><textarea name="notes" rows="3">{{ record.notes if record and record.notes else '' }}</textarea>
+<label>Next Action</label><input type="text" name="next_action" value="{{ record.next_action if record else '' }}" placeholder="e.g. Send capabilities statement, Follow up in 2 weeks">
+<div style="margin-top:1rem; display:flex; gap:0.5rem">
+  <button type="submit" class="btn btn-primary">Save</button>
+  <a href="/commercial/outreach" class="btn btn-outline">Cancel</a>
+</div>
+</form></div>
+{% endblock %}

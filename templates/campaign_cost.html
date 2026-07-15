@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.cost-card { background: #fff; border-radius:8px; padding:1rem; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,0.08); }
+.cost-card .value { font-size:1.5rem; font-weight:bold; }
+.cost-card .label { color:#888; font-size:0.8rem; margin-top:0.25rem; }
+</style>
+
+<h2>💰 {{ campaign.name }} — Cost Breakdown</h2>
+
+<p style="color:#888;margin-bottom:1rem">
+  Status: <span class="badge {% if campaign.status=='sent' %}badge-done{% elif campaign.status=='draft' %}badge-research{% endif %}">{{ campaign.status }}</span>
+  &nbsp;|&nbsp; Created: {{ campaign.created_at.strftime('%Y-%m-%d') if campaign.created_at else '-' }}
+</p>
+
+<div style="display:flex;gap:1rem;margin-bottom:1rem;flex-wrap:wrap">
+  <div class="cost-card" style="flex:1;min-width:120px">
+    <div class="value">${{ "%.2f"|format(campaign.total_cost or 0) }}</div>
+    <div class="label">Total Cost</div>
+  </div>
+  <div class="cost-card" style="flex:1;min-width:120px">
+    <div class="value">${{ "%.2f"|format(campaign.validation_cost or 0) }}</div>
+    <div class="label">ZeroBounce</div>
+  </div>
+  <div class="cost-card" style="flex:1;min-width:120px">
+    <div class="value">${{ "%.2f"|format(campaign.sending_cost or 0) }}</div>
+    <div class="label">Brevo Sends</div>
+  </div>
+  <div class="cost-card" style="flex:1;min-width:120px">
+    <div class="value">{{ campaign.credits_used or 0 }}</div>
+    <div class="label">ZB Credits Used</div>
+  </div>
+  <div class="cost-card" style="flex:1;min-width:120px">
+    <div class="value">{{ campaign.total_validated or 0 }}</div>
+    <div class="label">Validated</div>
+  </div>
+  <div class="cost-card" style="flex:1;min-width:120px">
+    <div class="value">{{ campaign.total_sent or 0 }}</div>
+    <div class="label">Emails Sent</div>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Recipient Details</h3>
+  <table><thead><tr>
+    <th>Name</th><th>Company</th><th>Email</th><th>Validation</th><th>Send Status</th><th>ZB Cost</th><th>Brevo Cost</th>
+  </tr></thead><tbody>
+    {% for r in recipients %}<tr>
+      <td>{{ r.first_name or '' }} {{ r.last_name or '' }}</td>
+      <td>{{ r.company_name or '-' }}</td>
+      <td>{{ r.email }}</td>
+      <td><span class="badge {% if r.validation_status=='valid' %}badge-done{% elif r.validation_status=='invalid' %}badge-danger{% endif %}">{{ r.validation_status or 'pending' }}</span></td>
+      <td><span class="badge {% if r.send_status=='sent' %}badge-done{% endif %}">{{ r.send_status or 'pending' }}</span></td>
+      <td>${{ "%.4f"|format(r.validation_cost or 0) }}</td>
+      <td>${{ "%.4f"|format(r.sending_cost or 0) }}</td>
+    </tr>{% else %}
+    <tr><td colspan="7" style="text-align:center;color:#888;padding:2rem">No recipients found.</td></tr>{% endfor %}
+  </tbody></table>
+</div>
+
+<div style="margin-top:1rem">
+  <a href="/commercial/costs" class="btn btn-secondary">← Back to Cost Dashboard</a>
+  <a href="/commercial/campaigns/{{ campaign.id }}" class="btn">View Campaign</a>
+</div>
+{% endblock %}

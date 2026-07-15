@@ -1,0 +1,15 @@
+[Unit]
+Description=SimRobotics CRM Portal
+After=network.target
+
+[Service]
+Type=simple
+User=lo
+WorkingDirectory=/home/lo/.openclaw/workspace/projects/crm-crud
+Environment=CRM_PORT=5050
+ExecStart=/home/lo/.openclaw/workspace/projects/crm-crud/venv/bin/python3 /home/lo/.openclaw/workspace/projects/crm-crud/app.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

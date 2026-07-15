@@ -89,6 +89,7 @@ form textarea { resize: vertical; min-height: 80px; }
         <a href="/" class="{% if active_page == 'index' %}active{% endif %}">Dashboard</a>
         <a href="/companies" class="{% if active_page == 'companies' %}active{% endif %}">Companies</a>
         <a href="/contacts" class="{% if active_page == 'contacts' %}active{% endif %}">Contacts</a>
+        <a href="/commercial/outreach" class="{% if active_page == 'commercial_outreach' %}active{% endif %}">Outreach &amp; Planning</a>
       </div>
     </div>
     <!-- Military -->
@@ -155,5 +156,6 @@ form textarea { resize: vertical; min-height: 80px; }
   {% endwith %}
   {% block content %}{% endblock %}
 </div>
+{% block scripts %}{% endblock %}
 </body>
 </html>
