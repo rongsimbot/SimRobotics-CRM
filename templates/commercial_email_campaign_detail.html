@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem">
+  <h2 style="margin:0">📧 {{ campaign.name }}</h2>
+  <a href="/commercial/email-campaigns" class="btn btn-outline">&larr; Back to Campaigns</a>
+</div>
+
+<div class="stats" style="grid-template-columns: repeat(4, 1fr); margin-bottom:1.5rem">
+  <div class="stat">
+    <div class="num">{{ recipients|length }}</div>
+    <div class="label">Recipients</div>
+  </div>
+  <div class="stat">
+    <div class="num">{{ campaign.total_opened or 0 }}</div>
+    <div class="label">Opened</div>
+  </div>
+  <div class="stat">
+    <div class="num">{{ campaign.total_clicked or 0 }}</div>
+    <div class="label">Clicked</div>
+  </div>
+  <div class="stat">
+    <div class="num">{{ campaign.total_bounced or 0 }}</div>
+    <div class="label">Bounced</div>
+  </div>
+</div>
+
+<div class="card">
+  <h3 style="margin-bottom:0.5rem">Campaign Details</h3>
+  <table style="margin-bottom:1.5rem">
+    <tr><td style="width:140px; font-weight:600; color:#666">Sender</td><td>{{ campaign.sender_email or '—' }}</td></tr>
+    <tr><td style="font-weight:600; color:#666">Status</td><td><span class="badge {% if campaign.status in ('Sent','sent') %}badge-done{% endif %}">{{ campaign.status }}</span></td></tr>
+    <tr><td style="font-weight:600; color:#666">Created</td><td>{{ campaign.created_at.strftime('%Y-%m-%d %H:%M') if campaign.created_at else '' }}</td></tr>
+    <tr><td style="font-weight:600; color:#666">Description</td><td>{{ campaign.description or '—' }}</td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <h3 style="margin-bottom:0.5rem">Recipients ({{ recipients|length }})</h3>
+  <table><thead><tr>
+    <th>Contact</th><th>Company</th><th>Email</th><th>Role</th><th>Date</th><th>Notes</th><th>Next Action</th>
+  </tr></thead><tbody>
+    {% for r in recipients %}<tr>
+      <td><strong>{{ r.first_name or '' }} {{ r.last_name or '' }}</strong></td>
+      <td>{{ r.company_name or '—' }}</td>
+      <td><small>{{ r.email or '—' }}</small></td>
+      <td>{{ r.role or '—' }}</td>
+      <td><small>{{ r.interaction_date or '' }}</small></td>
+      <td><small>{{ r.notes or '—' }}</small></td>
+      <td>{{ r.next_action or '—' }}</td>
+    </tr>{% else %}
+    <tr><td colspan="7" style="text-align:center;color:#888;padding:2rem">No recipients yet.</td></tr>{% endfor %}
+  </tbody></table>
+</div>
+{% endblock %}

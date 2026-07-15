@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 style="margin-bottom:0.5rem">Add Recipients — {{ campaign.name }}</h2>
+<p style="color:#888;margin-bottom:1rem">Target: {{ campaign.target_sector or 'All sectors' }} · {{ campaign.target_region or 'All regions' }} · {{ 'Non-customers' if campaign.target_is_customer=='no' else 'Existing customers' }}</p>
+
+<div class="card" style="margin-bottom:1rem">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <span><strong>{{ preview|length }}</strong> matching contacts found (showing up to 500)</span>
+    <form method="POST">
+      <button type="submit" class="btn btn-primary">Add All to Campaign</button>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <table><thead><tr>
+    <th>Contact</th><th>Role</th><th>Company</th><th>Sector</th><th>Region</th><th>Email</th>
+  </tr></thead><tbody>
+    {% for p in preview %}<tr>
+      <td><strong>{{ p.first_name }} {{ p.last_name }}</strong></td>
+      <td>{{ p.role or '—' }}</td>
+      <td>{{ p.company_name }}</td>
+      <td><small>{{ p.sector or '—' }}</small></td>
+      <td><small>{{ p.region or '—' }}</small></td>
+      <td><small>{{ p.email }}</small></td>
+    </tr>{% else %}
+    <tr><td colspan="6" style="text-align:center;color:#888;padding:2rem">No matching contacts. Try different filters.</td></tr>{% endfor %}
+  </tbody></table>
+</div>
+{% endblock %}

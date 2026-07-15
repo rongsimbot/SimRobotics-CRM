@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 style="margin-bottom:0.5rem">📧 Campaign Builder</h2>
+<div style="margin-bottom:1rem">
+  <a href="/commercial/campaigns/new" class="btn btn-primary">+ New Campaign</a>
+</div>
+<div class="card">
+  <table><thead><tr>
+    <th>Campaign</th><th>Target</th><th>Recipients</th><th>Validated</th><th>Sent</th><th>Status</th><th>Actions</th>
+  </tr></thead><tbody>
+    {% for c in campaigns %}<tr>
+      <td><strong><a href="/commercial/campaigns/{{ c.id }}">{{ c.name }}</a></strong></td>
+      <td><small>{{ c.target_sector or 'All' }}</small></td>
+      <td>{{ c.total_contacts }}</td>
+      <td>{{ c.total_validated }}</td>
+      <td>{{ c.total_sent }}</td>
+      <td><span class="badge {% if c.status=='sent' %}badge-done{% elif c.status=='draft' %}badge-research{% endif %}">{{ c.status }}</span></td>
+      <td class="actions">
+        <a href="/commercial/campaigns/{{ c.id }}" class="btn btn-sm btn-outline">View</a>
+        <form method="POST" action="/commercial/campaigns/{{ c.id }}/delete" style="display:inline" onsubmit="return confirm('Delete?')"><button class="btn btn-sm btn-danger">Del</button></form>
+      </td>
+    </tr>{% else %}
+    <tr><td colspan="7" style="text-align:center;color:#888;padding:2rem">No campaigns yet. <a href="/commercial/campaigns/new">Create one</a>.</td></tr>{% endfor %}
+  </tbody></table>
+</div>
+{% endblock %}

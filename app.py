@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """SimRobotics CRM v2.1 - Excel-Integrated Military CRM"""
-import os, sys, psycopg2, math
+import os, sys, psycopg2, math, time
 from flask import Flask, render_template, request, redirect, url_for, flash
 
 app = Flask(__name__)
@@ -52,6 +52,28 @@ def query_val(sql, params=()):
     val = cur.fetchone()
     conn.close()
     return val[0] if val else 0
+def query_insert(sql, params=()):
+    """Execute INSERT and return the new id."""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(sql, params)
+    conn.commit()
+    new_id = cur.fetchone()[0] if cur.description else None
+    cur.close()
+    return new_id
+
+
+def get_credits():
+    """Check ZeroBounce credits."""
+    import requests
+    resp = requests.get('https://api.zerobounce.net/v2/getcredits?api_key=11bd8545466c4a32b99a9446fc28632c', timeout=10)
+    return resp.json() if resp.status_code == 200 else {'Credits': '?'}
+
+def validate_email(email):
+    """Validate single email via ZeroBounce."""
+    import requests
+    resp = requests.get(f'https://api.zerobounce.net/v2/validate?api_key=11bd8545466c4a32b99a9446fc28632c&email={email}', timeout=15)
+    return resp.json() if resp.status_code == 200 else {'status': 'error'}
 
 def paginate(table, base_sql, count_sql, params, page, sort, order):
     page = max(1, page)
@@ -180,7 +202,21 @@ def commercial_outreach_list():
     rows = query(base_sql + f" ORDER BY {sort} {order} NULLS LAST LIMIT {PAGE_SIZE} OFFSET {offset}", tuple(params))
     statuses = query("SELECT DISTINCT status FROM commercial_outreach ORDER BY status")
     sectors = query("SELECT DISTINCT sector FROM companies WHERE sector IS NOT NULL ORDER BY sector")
-    return render_template('commercial_outreach.html', outreach_records=rows, query=q, status=status, statuses=statuses, sectors=sectors, sector_filter=sector_filter, is_customer_filter=is_customer_filter, page=page, total_pages=total_pages, total=total, sort=sort, order=order, section='commercial', active_page='commercial_outreach')
+    
+    recent_interactions = query("""
+        SELECT i.*, co.first_name, co.last_name, co.email,
+               c.name as company_name, ecr.campaign_id, ec.name as campaign_name
+        FROM interactions i
+        JOIN contacts co ON co.id = i.contact_id
+        JOIN companies c ON c.id = co.company_id
+        LEFT JOIN email_campaign_recipients ecr ON ecr.interaction_id = i.id
+        LEFT JOIN email_campaigns ec ON ec.id = ecr.campaign_id
+        WHERE i.interaction_date >= CURRENT_DATE - INTERVAL '30 days'
+        ORDER BY i.interaction_date DESC, i.id DESC
+        LIMIT 100
+    """)
+    
+    return render_template('commercial_outreach.html', outreach_records=rows, query=q, status=status, statuses=statuses, sectors=sectors, sector_filter=sector_filter, is_customer_filter=is_customer_filter, page=page, total_pages=total_pages, total=total, sort=sort, order=order, recent_interactions=recent_interactions, section='commercial', active_page='commercial_outreach')
 
 @app.route('/commercial/outreach/add', methods=['GET', 'POST'])
 @app.route('/commercial/outreach/<int:id>/edit', methods=['GET', 'POST'])
@@ -204,6 +240,40 @@ def commercial_outreach_form(id=None):
 
 @app.route('/commercial/outreach/<int:id>/delete', methods=['POST'])
 def commercial_outreach_delete(id): query("DELETE FROM commercial_outreach WHERE id=%s", (id,)); flash('Outreach record deleted.', 'success'); return redirect('/commercial/outreach')
+
+# ── Email Campaigns ─────────────────────────────────────────
+
+@app.route('/commercial/email-campaigns')
+def commercial_email_campaigns_list():
+    campaigns = query("""
+        SELECT ec.*,
+            (SELECT count(*) FROM email_campaign_recipients WHERE campaign_id=ec.id) as recipient_count
+        FROM email_campaigns ec
+        WHERE ec.audience_type = 'commercial'
+        ORDER BY ec.created_at DESC
+    """)
+    return render_template('commercial_email_campaigns.html', campaigns=campaigns,
+                          section='commercial', active_page='commercial_email_campaigns')
+
+@app.route('/commercial/email-campaigns/<int:id>')
+def commercial_email_campaign_detail(id):
+    campaign = query_one("SELECT * FROM email_campaigns WHERE id=%s", (id,))
+    if not campaign:
+        flash('Campaign not found', 'error'); return redirect('/commercial/email-campaigns')
+    recipients = query("""
+        SELECT ecr.*, i.interaction_date, i.channel, i.notes, i.next_action,
+               co.first_name, co.last_name, co.email, co.role,
+               c.name as company_name
+        FROM email_campaign_recipients ecr
+        JOIN interactions i ON i.id = ecr.interaction_id
+        JOIN contacts co ON co.id = ecr.contact_id
+        JOIN companies c ON c.id = co.company_id
+        WHERE ecr.campaign_id = %s
+        ORDER BY co.last_name, co.first_name
+    """, (id,))
+    return render_template('commercial_email_campaign_detail.html',
+                          campaign=campaign, recipients=recipients,
+                          section='commercial', active_page='commercial_email_campaigns')
 
 # ── Commercial Opportunities ─────────────────────────────────────
 
@@ -599,6 +669,517 @@ def admin_settings(): return placeholder('Settings', 'admin', 'admin_settings')
 def admin_users(): return placeholder('User Management', 'admin', 'admin_users')
 @app.route('/admin/audit')
 def admin_audit(): return placeholder('Audit Log', 'admin', 'admin_audit')
+
+# ── Campaign Builder (ZeroBounce + Brevo) ─────────────────────
+
+@app.route('/commercial/campaigns')
+def campaign_list():
+    campaigns = query("""
+        SELECT c.*, 
+               (SELECT count(*) FROM campaign_recipients WHERE campaign_id = c.id) as recipient_count
+        FROM campaigns c 
+        ORDER BY c.created_at DESC
+    """)
+    return render_template('campaign_list.html', campaigns=campaigns, 
+                          section='commercial', active_page='commercial_campaigns')
+
+def sync_commercial_to_marketing(campaign_id):
+    """Sync a commercial campaign to the marketing email_campaigns table."""
+    c = query_one("SELECT * FROM campaigns WHERE id=%s", (campaign_id,))
+    if not c:
+        return
+    existing = query_one("SELECT id FROM email_campaigns WHERE name=%s AND created_at::date = %s::date",
+                        (c['name'], c['created_at'].strftime('%Y-%m-%d') if c['created_at'] else None))
+    if existing:
+        # Update
+        query("""
+            UPDATE email_campaigns SET
+                name=%s, subject_line=%s, sender_email=%s, status=%s,
+                description=%s,
+                total_recipients = (SELECT count(*) FROM campaign_recipients WHERE campaign_id=%s),
+                total_sent = (SELECT count(*) FROM campaign_recipients WHERE campaign_id=%s AND send_status='sent'),
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+        """, (c['name'], c.get('subject_template'), c.get('sender_email'),
+               'sent' if c.get('status') == 'sent' else 'draft',
+               c.get('description'), campaign_id, campaign_id, existing['id']))
+    else:
+        # Insert new
+        query("""
+            INSERT INTO email_campaigns (name, subject_line, sender_email, audience_type, status,
+                description, total_recipients)
+            VALUES (%s, %s, %s, 'commercial', %s, %s,
+                (SELECT count(*) FROM campaign_recipients WHERE campaign_id=%s))
+        """, (c['name'], c.get('subject_template'), c.get('sender_email'),
+               'sent' if c.get('status') == 'sent' else 'draft',
+               c.get('description'), campaign_id))
+
+@app.route('/commercial/campaigns/new', methods=['GET', 'POST'])
+def campaign_new():
+    if request.method == 'POST':
+        campaign_id = query_insert("""
+            INSERT INTO campaigns (name, description, sender_name, sender_email, 
+                   subject_template, body_template, target_sector, target_region, 
+                   target_is_customer, status)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,'draft')
+            RETURNING id
+        """, (
+            request.form.get('name'),
+            request.form.get('description'),
+            request.form.get('sender_name', 'Ronnie Gaines'),
+            request.form.get('sender_email', 'rong@simrobotics.com'),
+            request.form.get('subject_template'),
+            request.form.get('body_template'),
+            request.form.get('target_sector') or None,
+            request.form.get('target_region') or None,
+            request.form.get('target_is_customer', 'no')
+        ))
+        sync_commercial_to_marketing(campaign_id)
+        flash('Campaign created! Now add recipients.', 'success')
+        return redirect(f'/commercial/campaigns/{campaign_id}')
+    
+    sectors = query("SELECT DISTINCT sector FROM companies WHERE sector IS NOT NULL ORDER BY sector")
+    regions = query("SELECT DISTINCT region FROM companies WHERE region IS NOT NULL ORDER BY region")
+    return render_template('campaign_form.html', sectors=sectors, regions=regions,
+                          section='commercial', active_page='commercial_campaigns')
+
+@app.route('/commercial/campaigns/<int:id>')
+def campaign_view(id):
+    campaign = query_one("SELECT * FROM campaigns WHERE id=%s", (id,))
+    if not campaign: flash('Campaign not found', 'error'); return redirect('/commercial/campaigns')
+    
+    recipients = query("""
+        SELECT cr.*, co.first_name, co.last_name, co.role, co.email,
+               c.name as company_name, c.sector
+        FROM campaign_recipients cr
+        JOIN contacts co ON co.id = cr.contact_id
+        JOIN companies c ON c.id = co.company_id
+        WHERE cr.campaign_id = %s
+        ORDER BY co.first_name, co.last_name
+    """, (id,))
+    
+    stats = {
+        'total': len(recipients),
+        'validated': sum(1 for r in recipients if r.validation_status == 'valid'),
+        'invalid': sum(1 for r in recipients if r.validation_status == 'invalid'),
+        'pending_validation': sum(1 for r in recipients if not r.validation_status),
+        'sent': sum(1 for r in recipients if r.send_status == 'sent'),
+        'delivered': sum(1 for r in recipients if r.send_status == 'delivered'),
+        'opened': sum(1 for r in recipients if r.send_status == 'opened'),
+        'bounced': sum(1 for r in recipients if r.send_status == 'bounced'),
+    }
+    
+    return render_template('campaign_view.html', campaign=campaign, recipients=recipients,
+                          stats=stats, section='commercial', active_page='commercial_campaigns')
+
+@app.route('/commercial/campaigns/<int:id>/recipients', methods=['GET', 'POST'])
+def campaign_recipients(id):
+    campaign = query_one("SELECT * FROM campaigns WHERE id=%s", (id,))
+    if not campaign: flash('Campaign not found', 'error'); return redirect('/commercial/campaigns')
+    
+    if request.method == 'POST':
+        where = ["co.email IS NOT NULL", "co.email != ''"]
+        params = []
+        
+        if campaign.target_sector:
+            where.append("c.sector = %s")
+            params.append(campaign.target_sector)
+        if campaign.target_region:
+            where.append("c.region ILIKE %s")
+            params.append(f'%{campaign.target_region}%')
+        if campaign.target_is_customer == 'no':
+            where.append("(c.is_existing_customer = false OR c.is_existing_customer IS NULL)")
+        elif campaign.target_is_customer == 'yes':
+            where.append("c.is_existing_customer = true")
+        
+        w = " AND ".join(where)
+        
+        query(f"""
+            INSERT INTO campaign_recipients (campaign_id, contact_id, email)
+            SELECT %s, co.id, co.email
+            FROM contacts co
+            JOIN companies c ON c.id = co.company_id
+            WHERE {w}
+            AND NOT EXISTS (
+                SELECT 1 FROM campaign_recipients cr 
+                WHERE cr.campaign_id = %s AND cr.contact_id = co.id
+            )
+        """, [id] + params + [id])
+        
+        query("""
+            UPDATE campaigns SET 
+                total_contacts = (SELECT count(*) FROM campaign_recipients WHERE campaign_id = %s),
+                total_companies = (SELECT count(DISTINCT co.company_id) FROM campaign_recipients cr JOIN contacts co ON co.id = cr.contact_id WHERE cr.campaign_id = %s),
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+        """, (id, id, id))
+        
+        count = query_val("SELECT count(*) FROM campaign_recipients WHERE campaign_id = %s", (id,))
+        sync_commercial_to_marketing(id)
+        flash(f'{count} recipients added to campaign!', 'success')
+        return redirect(f'/commercial/campaigns/{id}')
+    
+    where = ["co.email IS NOT NULL", "co.email != ''"]
+    params = []
+    if campaign.target_sector:
+        where.append("c.sector = %s")
+        params.append(campaign.target_sector)
+    if campaign.target_region:
+        where.append("c.region ILIKE %s")
+        params.append(f'%{campaign.target_region}%')
+    if campaign.target_is_customer == 'no':
+        where.append("(c.is_existing_customer = false OR c.is_existing_customer IS NULL)")
+    elif campaign.target_is_customer == 'yes':
+        where.append("c.is_existing_customer = true")
+    w = " AND ".join(where)
+    
+    preview = query(f"""
+        SELECT co.id, co.first_name, co.last_name, co.email, co.role,
+               c.name as company_name, c.sector, c.region
+        FROM contacts co
+        JOIN companies c ON c.id = co.company_id
+        WHERE {w}
+        ORDER BY c.name, co.first_name
+        LIMIT 500
+    """, params)
+    
+    return render_template('campaign_recipients.html', campaign=campaign, preview=preview,
+                          section='commercial', active_page='commercial_campaigns')
+
+@app.route('/commercial/campaigns/<int:id>/delete', methods=['POST'])
+def campaign_delete(id):
+    query("DELETE FROM campaign_recipients WHERE campaign_id=%s", (id,))
+    query("DELETE FROM campaigns WHERE id=%s", (id,))
+    flash('Campaign deleted.', 'success')
+    return redirect('/commercial/campaigns')
+# ── Campaign Sending (via Brevo) ──────────────────────────────
+
+@app.route('/commercial/campaigns/<int:id>/send', methods=['GET', 'POST'])
+def campaign_send(id):
+    """Send campaign emails via Brevo."""
+    campaign = query_one("SELECT * FROM campaigns WHERE id=%s", (id,))
+    if not campaign: flash('Campaign not found', 'error'); return redirect('/commercial/campaigns')
+    
+    if request.method == 'POST':
+        # Get all pending recipients
+        recipients = query("""
+            SELECT cr.id as cr_id, cr.email, co.first_name, co.last_name, 
+                   c.name as company_name
+            FROM campaign_recipients cr
+            JOIN contacts co ON co.id = cr.contact_id
+            JOIN companies c ON c.id = co.company_id
+            WHERE cr.campaign_id = %s AND (cr.send_status = 'pending' OR cr.send_status IS NULL)
+        """, (id,))
+        
+        if not recipients:
+            flash('No pending recipients to send to.', 'warning')
+            return redirect(f'/commercial/campaigns/{id}')
+        
+        # Build recipient dicts for Brevo
+        recip_dicts = [{
+            'email': r.email,
+            'first_name': r.first_name,
+            'last_name': r.last_name,
+            'company': r.company_name
+        } for r in recipients]
+        
+        # Get CC list from form
+        cc_list = request.form.get('cc', '').split(',') if request.form.get('cc') else []
+        cc_list = [e.strip() for e in cc_list if e.strip()]
+        
+        # Import and use brevo
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'integrations'))
+        import brevo
+        
+        flash_msg = f'Sending {len(recip_dicts)} emails via Brevo...'
+        flash(flash_msg, 'info')
+        
+        results = brevo.send_batch(
+            campaign.sender_name or 'Ronnie Gaines',
+            campaign.sender_email or 'rong@simrobotics.com',
+            recip_dicts,
+            campaign.subject_template or 'SimRobotics - BIM/VDC Services',
+            campaign.body_template or '<html><body><p>Hello {first_name},</p></body></html>',
+            cc=cc_list
+        )
+        
+        # Update campaign_recipients with results
+        sent_count = 0
+        for i, result in enumerate(results):
+            if i < len(recipients):
+                cr = recipients[i]
+                if result['success']:
+                    query("""
+                        UPDATE campaign_recipients 
+                        SET send_status='sent', sent_at=CURRENT_TIMESTAMP, 
+                            brevo_message_id=%s 
+                        WHERE id=%s
+                    """, (result.get('message_id', ''), cr.cr_id))
+                    sent_count += 1
+        
+        # Update campaign totals
+        query("""
+            UPDATE campaigns SET 
+                total_sent = (SELECT count(*) FROM campaign_recipients WHERE campaign_id=%s AND send_status='sent'),
+                status = 'sent',
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+        """, (id, id))
+        
+        # Calculate costs after sending
+        calculate_campaign_cost(id)
+        
+        sync_commercial_to_marketing(id)
+        flash(f'Campaign sent! {sent_count} of {len(recip_dicts)} emails delivered via Brevo.', 'success')
+        return redirect(f'/commercial/campaigns/{id}')
+    
+    # GET: show send confirmation page
+    pending = query_val("""
+        SELECT count(*) FROM campaign_recipients 
+        WHERE campaign_id=%s AND (send_status='pending' OR send_status IS NULL)
+    """, (id,))
+    
+    already_sent = query_val("""
+        SELECT count(*) FROM campaign_recipients 
+        WHERE campaign_id=%s AND send_status='sent'
+    """, (id,))
+    
+    return render_template('campaign_send.html', campaign=campaign, 
+                          pending=pending, already_sent=already_sent,
+                          section='commercial', active_page='commercial_campaigns')
+
+
+# ── Campaign Email Validation (ZeroBounce) ────────────────────
+
+@app.route('/commercial/campaigns/<int:id>/validate', methods=['GET', 'POST'])
+def campaign_validate(id):
+    """Validate campaign recipient emails via ZeroBounce."""
+    campaign = query_one("SELECT * FROM campaigns WHERE id=%s", (id,))
+    if not campaign: flash('Campaign not found', 'error'); return redirect('/commercial/campaigns')
+    
+    if request.method == 'POST':
+        # Get unvalidated recipients
+        recipients = query("""
+            SELECT cr.id as cr_id, cr.email
+            FROM campaign_recipients cr
+            WHERE cr.campaign_id = %s AND (cr.validation_status IS NULL OR cr.validation_status = '')
+        """, (id,))
+        
+        if not recipients:
+            flash('No unvalidated recipients.', 'warning')
+            return redirect(f'/commercial/campaigns/{id}')
+        
+        # Check credits first
+        zb_credits = get_credits()
+        available = int(zb_credits.get('Credits', 0))
+        if available < len(recipients):
+            flash(f'Not enough ZeroBounce credits! Need {len(recipients)}, have {available}.', 'error')
+            return redirect(f'/commercial/campaigns/{id}')
+        
+        emails = [r.email for r in recipients]
+        flash(f'Validating {len(emails)} emails... This may take a minute.', 'info')
+        
+        # Run validation (do it synchronously but with progress)
+        for i, r in enumerate(recipients):
+            try:
+                result = validate_email(r.email)
+                status = result.get('status', 'error')
+                sub_status = result.get('sub_status', '')
+                
+                # Store result
+                query("""
+                    INSERT INTO email_validations (contact_id, email, status, sub_status, 
+                        free_email, did_you_mean, account, domain, domain_age_days, smtp_provider)
+                    SELECT cr.contact_id, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                    FROM campaign_recipients cr WHERE cr.id = %s
+                    ON CONFLICT DO NOTHING
+                """, (r.email, status, sub_status,
+                      result.get('free_email', False),
+                      result.get('did_you_mean'),
+                      result.get('account'),
+                      result.get('domain'),
+                      str(result.get('domain_age_days', '')),
+                      result.get('smtp_provider'),
+                      r.cr_id))
+                
+                # Update campaign_recipient
+                query("""
+                    UPDATE campaign_recipients 
+                    SET validation_status = %s
+                    WHERE id = %s
+                """, (status, r.cr_id))
+                
+                time.sleep(0.3)  # Rate limit
+                
+            except Exception as e:
+                query("""
+                    UPDATE campaign_recipients SET validation_status = 'error', error_message = %s WHERE id = %s
+                """, (str(e)[:500], r.cr_id))
+        
+        # Update campaign counts
+        query("""
+            UPDATE campaigns SET
+                total_validated = (SELECT count(*) FROM campaign_recipients WHERE campaign_id=%s AND validation_status='valid'),
+                status = 'ready',
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+        """, (id, id))
+        
+        # Calculate costs after validation
+        calculate_campaign_cost(id)
+        
+        valid_count = query_val("SELECT count(*) FROM campaign_recipients WHERE campaign_id=%s AND validation_status='valid'", (id,))
+        invalid_count = query_val("SELECT count(*) FROM campaign_recipients WHERE campaign_id=%s AND validation_status='invalid'", (id,))
+        
+        sync_commercial_to_marketing(id)
+        flash(f'Validation complete! {valid_count} valid, {invalid_count} invalid.', 'success')
+        return redirect(f'/commercial/campaigns/{id}')
+    
+    # GET: show validation preview
+    unvalidated = query_val("""
+        SELECT count(*) FROM campaign_recipients 
+        WHERE campaign_id=%s AND (validation_status IS NULL OR validation_status = '')
+    """, (id,))
+    
+    already_valid = query_val("""
+        SELECT count(*) FROM campaign_recipients WHERE campaign_id=%s AND validation_status='valid'
+    """, (id,))
+    
+    already_invalid = query_val("""
+        SELECT count(*) FROM campaign_recipients WHERE campaign_id=%s AND validation_status='invalid'
+    """, (id,))
+    
+    credits = get_credits() if request.args.get('check','') else {}
+    
+    return render_template('campaign_validate.html', campaign=campaign,
+                          unvalidated=unvalidated, already_valid=already_valid,
+                          already_invalid=already_invalid, credits=credits,
+                          section='commercial', active_page='commercial_campaigns')
+
+# ── Cost Tracking Dashboard ───────────────────────────────────
+
+def get_cost_rates():
+    """Return current cost rates for Brevo and ZeroBounce."""
+    return {
+        'brevo_monthly_included': 5000,
+        'brevo_overage_per_email': 0.013,
+        'zerobounce_free_credits': 100,
+        'zerobounce_per_email': 0.01
+    }
+
+def calculate_campaign_cost(campaign_id):
+    """Calculate and store cost for a campaign."""
+    rates = get_cost_rates()
+    
+    # Get campaign stats
+    validated = query_val("SELECT count(*) FROM campaign_recipients WHERE campaign_id=%s AND validation_status IS NOT NULL AND validation_status != ''", (campaign_id,)) or 0
+    sent = query_val("SELECT count(*) FROM campaign_recipients WHERE campaign_id=%s AND send_status='sent'", (campaign_id,)) or 0
+    
+    # Calculate ZeroBounce cost (first 100 free, then $0.01 each)
+    # Track cumulative credits used across all campaigns
+    total_validated_all = query_val("SELECT coalesce(sum(credits_used), 0) FROM campaigns") or 0
+    
+    # What portion of the free 100 credits has been used already
+    free_used_before = min(total_validated_all, rates['zerobounce_free_credits'])
+    free_remaining_before = max(0, rates['zerobounce_free_credits'] - free_used_before)
+    
+    # This campaign's validation
+    free_for_this_campaign = min(validated, free_remaining_before)
+    paid_for_this_campaign = max(0, validated - free_for_this_campaign)
+    zb_cost = round(paid_for_this_campaign * rates['zerobounce_per_email'], 4)
+    
+    # Calculate Brevo cost (free within monthly limit, then $0.013 each)
+    total_sent_all = query_val("SELECT coalesce(sum(total_sent), 0) FROM campaigns") or 0
+    sent_before = max(0, total_sent_all - sent)
+    free_sends_before = min(sent_before, rates['brevo_monthly_included'])
+    free_sends_remaining = max(0, rates['brevo_monthly_included'] - free_sends_before)
+    
+    free_for_this = min(sent, free_sends_remaining)
+    paid_for_this = max(0, sent - free_for_this)
+    brevo_cost = round(paid_for_this * rates['brevo_overage_per_email'], 4)
+    
+    total = round(zb_cost + brevo_cost, 4)
+    
+    # Store in campaign
+    query("""
+        UPDATE campaigns SET 
+            validation_cost = %s, sending_cost = %s, total_cost = %s,
+            credits_used = %s, updated_at = CURRENT_TIMESTAMP
+        WHERE id = %s
+    """, (zb_cost, brevo_cost, total, validated, campaign_id))
+    
+    return {'validation_cost': zb_cost, 'sending_cost': brevo_cost, 'total_cost': total, 'credits_used': validated}
+
+@app.route('/commercial/costs')
+def cost_dashboard():
+    """Cost tracking dashboard for all campaigns."""
+    rates = get_cost_rates()
+    
+    # Overall stats
+    total_validated = query_val("SELECT coalesce(sum(credits_used), 0) FROM campaigns") or 0
+    total_sent = query_val("SELECT coalesce(sum(total_sent), 0) FROM campaigns") or 0
+    total_cost = query_val("SELECT coalesce(sum(total_cost), 0) FROM campaigns") or 0
+    total_zb_cost = query_val("SELECT coalesce(sum(validation_cost), 0) FROM campaigns") or 0
+    total_brevo_cost = query_val("SELECT coalesce(sum(sending_cost), 0) FROM campaigns") or 0
+    
+    # Remaining free
+    zb_free_used = min(total_validated, rates['zerobounce_free_credits'])
+    zb_free_remaining = max(0, rates['zerobounce_free_credits'] - zb_free_used)
+    brevo_used = min(total_sent, rates['brevo_monthly_included'])
+    brevo_remaining = max(0, rates['brevo_monthly_included'] - brevo_used)
+    
+    # Per-campaign breakdown
+    campaigns = query("""
+        SELECT id, name, status, total_contacts, total_validated, total_sent,
+               credits_used, validation_cost, sending_cost, total_cost, created_at
+        FROM campaigns
+        ORDER BY created_at DESC
+    """)
+    
+    # Recent recipients with costs
+    recent = query("""
+        SELECT c.name as campaign_name, cr.email, cr.validation_status, 
+               cr.send_status, cr.validation_cost, cr.sending_cost,
+               co.first_name, co.last_name, comp.name as company_name
+        FROM campaign_recipients cr
+        JOIN campaigns c ON c.id = cr.campaign_id
+        JOIN contacts co ON co.id = cr.contact_id
+        JOIN companies comp ON comp.id = co.company_id
+        ORDER BY cr.id DESC
+        LIMIT 50
+    """)
+    
+    return render_template('cost_dashboard.html', 
+                          rates=rates, total_validated=total_validated, total_sent=total_sent,
+                          total_cost=total_cost, total_zb_cost=total_zb_cost, 
+                          total_brevo_cost=total_brevo_cost,
+                          zb_free_remaining=zb_free_remaining, brevo_remaining=brevo_remaining,
+                          campaigns=campaigns, recent=recent,
+                          section='commercial', active_page='commercial_costs')
+
+@app.route('/commercial/campaigns/<int:id>/cost')
+def campaign_cost(id):
+    """Show cost breakdown for a single campaign."""
+    campaign = query_one("SELECT * FROM campaigns WHERE id=%s", (id,))
+    if not campaign: flash('Campaign not found', 'error'); return redirect('/commercial/campaigns')
+    
+    # Calculate/refresh costs
+    cost = calculate_campaign_cost(id)
+    campaign = query_one("SELECT * FROM campaigns WHERE id=%s", (id,))
+    
+    # Per-recipient cost details
+    recipients = query("""
+        SELECT cr.*, co.first_name, co.last_name, comp.name as company_name
+        FROM campaign_recipients cr
+        JOIN contacts co ON co.id = cr.contact_id
+        JOIN companies comp ON comp.id = co.company_id
+        WHERE cr.campaign_id = %s
+        ORDER BY cr.validation_cost DESC, cr.send_status
+    """, (id,))
+    
+    return render_template('campaign_cost.html', campaign=campaign, 
+                          recipients=recipients, section='commercial',
+                          active_page='commercial_campaigns')
 
 # ── Main ────────────────────────────────────────────────────────
 if __name__ == '__main__':

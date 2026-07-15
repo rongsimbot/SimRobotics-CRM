@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 style="margin-bottom:0.5rem">📧 Email Campaigns</h2>
+
+<div class="stats" style="grid-template-columns: repeat(3, 1fr); margin-bottom:1.5rem">
+  <div class="stat">
+    <div class="num">{{ campaigns|length }}</div>
+    <div class="label">Total Campaigns</div>
+  </div>
+  {% set total_sent = namespace(val=0) %}
+  {% set total_opened = namespace(val=0) %}
+  {% for c in campaigns %}
+    {% set total_sent.val = total_sent.val + (c.total_recipients or 0) %}
+    {% set total_opened.val = total_opened.val + (c.total_opened or 0) %}
+  {% endfor %}
+  <div class="stat">
+    <div class="num">{{ total_sent.val }}</div>
+    <div class="label">Total Emails Sent</div>
+  </div>
+  <div class="stat">
+    <div class="num">{{ total_opened.val }}</div>
+    <div class="label">Total Opened</div>
+  </div>
+</div>
+
+<div class="card">
+  <table><thead><tr>
+    <th>Campaign</th><th>Description</th><th>Sender</th><th>Recipients</th><th>Opened</th><th>Status</th><th>Date</th>
+  </tr></thead><tbody>
+    {% for c in campaigns %}<tr>
+      <td><a href="/commercial/email-campaigns/{{ c.id }}" style="font-weight:600; color:#1a1a2e">{{ c.name }}</a></td>
+      <td><small>{{ c.description or '—' }}</small></td>
+      <td>{{ c.sender_email or '—' }}</td>
+      <td>{{ c.recipient_count or 0 }}</td>
+      <td>{{ c.total_opened or 0 }}</td>
+      <td><span class="badge {% if c.status in ('Sent','sent') %}badge-done{% endif %}">{{ c.status }}</span></td>
+      <td><small>{{ c.created_at.strftime('%Y-%m-%d') if c.created_at else '' }}</small></td>
+    </tr>{% else %}
+    <tr><td colspan="7" style="text-align:center;color:#888;padding:2rem">No email campaigns yet.</td></tr>{% endfor %}
+  </tbody></table>
+</div>
+{% endblock %}

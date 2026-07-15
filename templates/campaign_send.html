@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 style="margin-bottom:0.5rem">📤 Send Campaign — {{ campaign.name }}</h2>
+
+<div class="card" style="margin-bottom:1rem">
+  <h3>Campaign Summary</h3>
+  <p><strong>Target:</strong> {{ campaign.target_sector or 'All sectors' }} · {{ campaign.target_region or 'All regions' }}</p>
+  <p><strong>Pending recipients:</strong> {{ pending }}</p>
+  <p><strong>Already sent:</strong> {{ already_sent }}</p>
+  <p><strong>Sender:</strong> {{ campaign.sender_name }} &lt;{{ campaign.sender_email }}&gt;</p>
+  <p><strong>Subject:</strong> <code>{{ campaign.subject_template }}</code></p>
+</div>
+
+{% if pending > 0 %}
+<div class="card">
+  <h3 style="margin-bottom:0.5rem">Confirm Send</h3>
+  <p style="color:#e74c3c;margin-bottom:1rem">⚠️ This will send {{ pending }} emails via Brevo. This cannot be undone.</p>
+  <form method="POST">
+    <div class="form-group">
+      <label>CC (optional, comma-separated)</label>
+      <input type="text" name="cc" value="AndreaJ@simrobotics.com, synclairg@simrobotics.com" class="form-control" style="max-width:400px">
+    </div>
+    <button type="submit" class="btn btn-primary" style="background:#e74c3c;margin-top:1rem" onclick="return confirm('Send {{ pending }} emails now?')">🚀 Send via Brevo</button>
+  </form>
+</div>
+{% else %}
+<div class="card">
+  <p style="color:#888">No pending recipients. All emails have been sent. <a href="/commercial/campaigns/{{ campaign.id }}">Back to campaign</a>.</p>
+</div>
+{% endif %}
+{% endblock %}
