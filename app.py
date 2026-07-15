@@ -5,6 +5,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('CRM_SECRET', 'simrobotics-crm-2026')
+app.config['TEMPLATES_AUTO_RELOAD'] = True
 
 DB_CONFIG = {
     'host': 'localhost', 'port': 5432,
@@ -789,6 +790,13 @@ def campaign_view(id):
                           stats=stats, page=page, total_pages=total_pages,
                           sort=sort_col, order=order, next_order=next_order,
                           section='commercial', active_page='commercial_campaigns')
+
+@app.route('/commercial/campaigns/<int:id>/recipients/<int:recipient_id>/delete', methods=['POST'])
+def campaign_recipient_delete(id, recipient_id):
+    query("DELETE FROM campaign_recipients WHERE id=%s AND campaign_id=%s", (recipient_id, id))
+    flash('Recipient removed.', 'success')
+    return redirect(f'/commercial/campaigns/{id}')
+
 @app.route('/commercial/campaigns/<int:id>/recipients', methods=['GET', 'POST'])
 def campaign_recipients(id):
     campaign = query_one("SELECT * FROM campaigns WHERE id=%s", (id,))
