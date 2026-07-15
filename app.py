@@ -698,12 +698,11 @@ def sync_commercial_to_marketing(campaign_id):
                 name=%s, subject_line=%s, sender_email=%s, status=%s,
                 description=%s,
                 total_recipients = (SELECT count(*) FROM campaign_recipients WHERE campaign_id=%s),
-                total_sent = (SELECT count(*) FROM campaign_recipients WHERE campaign_id=%s AND send_status='sent'),
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = %s
         """, (c['name'], c.get('subject_template'), c.get('sender_email'),
                'sent' if c.get('status') == 'sent' else 'draft',
-               c.get('description'), campaign_id, campaign_id, existing['id']))
+               c.get('description'), campaign_id, existing['id']))
     else:
         # Insert new
         query("""
@@ -879,11 +878,14 @@ def campaign_recipients(id):
             where.append("c.sector = %s")
             params.append(campaign['target_sector'])
         if campaign.get('target_region'):
-            where.append("c.region ILIKE %s")
-            params.append(f'%{campaign["target_region"]}%')
+            regions = [r.strip() for r in campaign['target_region'].split(',') if r.strip()]
+            if regions:
+                clauses = ['c.region ILIKE %s' for _ in regions]
+                where.append(f"({' OR '.join(clauses)})")
+                params.extend(['%' + r + '%' for r in regions])
         if campaign.get('target_is_customer') == 'no':
             where.append("(c.is_existing_customer = false OR c.is_existing_customer IS NULL)")
-        elif campaign.target_is_customer == 'yes':
+        elif campaign.get('target_is_customer') == 'yes':
             where.append("c.is_existing_customer = true")
         
         w = " AND ".join(where)
@@ -919,11 +921,14 @@ def campaign_recipients(id):
         where.append("c.sector = %s")
         params.append(campaign['target_sector'])
     if campaign.get('target_region'):
-        where.append("c.region ILIKE %s")
-        params.append(f'%{campaign["target_region"]}%')
+        regions = [r.strip() for r in campaign['target_region'].split(',') if r.strip()]
+        if regions:
+            clauses = ['c.region ILIKE %s' for _ in regions]
+            where.append(f"({' OR '.join(clauses)})")
+            params.extend(['%' + r + '%' for r in regions])
     if campaign.get('target_is_customer') == 'no':
         where.append("(c.is_existing_customer = false OR c.is_existing_customer IS NULL)")
-    elif campaign.target_is_customer == 'yes':
+    elif campaign.get('target_is_customer') == 'yes':
         where.append("c.is_existing_customer = true")
     w = " AND ".join(where)
     
