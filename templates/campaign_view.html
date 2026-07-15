@@ -1,17 +1,12 @@
 {% extends "base.html" %}
 {% block content %}
 <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem;">
-  <div>
-    <h2 style="margin:0;">📧 {{ campaign.name }}</h2>
-    {% if campaign.description %}<p style="color:#888;margin:0.3rem 0 0;">{{ campaign.description }}</p>{% endif %}
-  </div>
-  <div class="actions">
+  <div><h2 style="margin:0;">{{ campaign.name }}</h2></div>
+  <div style="display:flex;gap:0.4rem;">
     <a href="/commercial/campaigns/{{ campaign.id }}/recipients" class="btn btn-primary btn-sm">+ Add Recipients</a>
-    <a href="/commercial/campaigns/{{ campaign.id }}/validate" class="btn btn-primary btn-sm">✓ Validate</a>
-    <a href="/commercial/campaigns/{{ campaign.id }}/send" class="btn btn-primary btn-sm">🚀 Send</a>
-    <form method="POST" action="/commercial/campaigns/{{ campaign.id }}/delete" style="display:inline;" onsubmit="return confirm('Delete this campaign?');">
-      <button type="submit" class="btn btn-danger btn-sm">Delete</button>
-    </form>
+    <a href="/commercial/campaigns/{{ campaign.id }}/validate" class="btn btn-primary btn-sm">Validate</a>
+    <a href="/commercial/campaigns/{{ campaign.id }}/send" class="btn btn-primary btn-sm">Send</a>
+    <form method="POST" action="/commercial/campaigns/{{ campaign.id }}/delete" style="display:inline;" onsubmit="return confirm('Delete campaign?');"><button type="submit" class="btn btn-danger btn-sm">Delete Campaign</button></form>
   </div>
 </div>
 <div class="stats">
@@ -20,42 +15,34 @@
   <div class="stat"><div class="num">{{ stats.invalid }}</div><div class="label">Invalid</div></div>
   <div class="stat"><div class="num">{{ stats.sent }}</div><div class="label">Sent</div></div>
 </div>
-<div class="stats" style="margin-top:0.5rem;">
-  <div class="stat"><div class="num">{{ stats.opened }}</div><div class="label">Opened</div></div>
-  <div class="stat"><div class="num">{{ stats.bounced }}</div><div class="label">Bounced</div></div>
-  <div class="stat"><div class="num">{{ stats.delivered }}</div><div class="label">Delivered</div></div>
-  <div class="stat"><div class="num">{{ stats.pending_validation }}</div><div class="label">Pending Validation</div></div>
-</div>
 <div class="card" style="margin-top:1.5rem;">
   <h3 style="margin:0 0 0.75rem 0;">Recipients ({{ stats.total }})</h3>
   {% if total_pages > 1 %}
   <div style="margin-bottom:1rem;display:flex;justify-content:center;align-items:center;gap:0.4rem;flex-wrap:wrap;padding:0.5rem;background:#f8f9fa;border-radius:6px;">
-    {% if page > 1 %}<a href="?page=1&sort={{ sort }}&order={{ order }}" class="btn btn-outline btn-sm">&laquo; First</a><a href="?page={{ page-1 }}&sort={{ sort }}&order={{ order }}" class="btn btn-outline btn-sm">&lsaquo; Prev</a>{% endif %}
-    <span style="font-weight:600;color:#333;font-size:0.85rem;padding:0 0.5rem;">Page {{ page }} of {{ total_pages }} ({{ ((page-1)*50 + 1) }}-{{ [page*50, stats.total]|min }} of {{ stats.total }})</span>
-    {% if page < total_pages %}<a href="?page={{ page+1 }}&sort={{ sort }}&order={{ order }}" class="btn btn-outline btn-sm">Next &rsaquo;</a><a href="?page={{ total_pages }}&sort={{ sort }}&order={{ order }}" class="btn btn-outline btn-sm">Last &raquo;</a>{% endif %}
+    {% if page > 1 %}<a href="?page=1&sort={{ sort }}&order={{ order }}" class="btn btn-outline btn-sm">First</a><a href="?page={{ page-1 }}&sort={{ sort }}&order={{ order }}" class="btn btn-outline btn-sm">Prev</a>{% endif %}
+    <span style="font-weight:600;font-size:0.85rem;">Page {{ page }} of {{ total_pages }} ({{ ((page-1)*50 + 1) }}-{{ [page*50, stats.total]|min }} of {{ stats.total }})</span>
+    {% if page < total_pages %}<a href="?page={{ page+1 }}&sort={{ sort }}&order={{ order }}" class="btn btn-outline btn-sm">Next</a><a href="?page={{ total_pages }}&sort={{ sort }}&order={{ order }}" class="btn btn-outline btn-sm">Last</a>{% endif %}
   </div>
   {% endif %}
   <table>
     <thead><tr style="background:#f0f2f5;">
-      <th><a href="?sort=last_name&order={% if sort=='last_name' %}{{ next_order }}{% else %}asc{% endif %}" style="color:#555;text-decoration:none;">Contact {% if sort=='last_name' %}{% if order=='asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
-      <th><a href="?sort=email&order={% if sort=='email' %}{{ next_order }}{% else %}asc{% endif %}" style="color:#555;text-decoration:none;">Email {% if sort=='email' %}{% if order=='asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
-      <th><a href="?sort=company_name&order={% if sort=='company_name' %}{{ next_order }}{% else %}asc{% endif %}" style="color:#555;text-decoration:none;">Company {% if sort=='company_name' %}{% if order=='asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
-      <th><a href="?sort=sector&order={% if sort=='sector' %}{{ next_order }}{% else %}asc{% endif %}" style="color:#555;text-decoration:none;">Sector {% if sort=='sector' %}{% if order=='asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
-      <th><a href="?sort=validation_status&order={% if sort=='validation_status' %}{{ next_order }}{% else %}asc{% endif %}" style="color:#555;text-decoration:none;">Validation {% if sort=='validation_status' %}{% if order=='asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
-      <th><a href="?sort=send_status&order={% if sort=='send_status' %}{{ next_order }}{% else %}asc{% endif %}" style="color:#555;text-decoration:none;">Send Status {% if sort=='send_status' %}{% if order=='asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
-      <th>Actions</th>
+      <th><a href="?sort=last_name&order={% if sort=='last_name' %}{{ next_order }}{% else %}asc{% endif %}">Contact {% if sort=='last_name' %}{% if order=='asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
+      <th><a href="?sort=email&order={% if sort=='email' %}{{ next_order }}{% else %}asc{% endif %}">Email {% if sort=='email' %}{% if order=='asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
+      <th><a href="?sort=company_name&order={% if sort=='company_name' %}{{ next_order }}{% else %}asc{% endif %}">Company {% if sort=='company_name' %}{% if order=='asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
+      <th><a href="?sort=validation_status&order={% if sort=='validation_status' %}{{ next_order }}{% else %}asc{% endif %}">Validation {% if sort=='validation_status' %}{% if order=='asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
+      <th><a href="?sort=send_status&order={% if sort=='send_status' %}{{ next_order }}{% else %}asc{% endif %}">Send Status {% if sort=='send_status' %}{% if order=='asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
+      <th style="width:80px;">Actions</th>
     </tr></thead>
     <tbody>
-      {% for r in recipients %}<tr style="border-bottom:1px solid #eee;">
+      {% for r in recipients %}<tr>
         <td><strong>{{ r.last_name or '' }}, {{ r.first_name or '' }}</strong></td>
         <td><small>{{ r.email or '-' }}</small></td>
         <td>{{ r.company_name or '-' }}</td>
-        <td>{{ r.sector or '-' }}</td>
-        <td>{% if r.validation_status == 'valid' %}<span class="badge badge-done">valid</span>{% elif r.validation_status == 'invalid' %}<span class="badge badge-danger">invalid</span>{% elif r.validation_status == 'catch_all' %}<span class="badge badge-research">catch-all</span>{% else %}<span class="badge">pending</span>{% endif %}</td>
-        <td>{% if r.send_status == 'sent' %}<span class="badge badge-done">sent</span>{% elif r.send_status == 'opened' %}<span class="badge badge-done">opened</span>{% elif r.send_status == 'bounced' %}<span class="badge badge-danger">bounced</span>{% elif r.send_status == 'delivered' %}<span class="badge badge-done">delivered</span>{% else %}<span class="badge">pending</span>{% endif %}</td>
+        <td>{% if r.validation_status == 'valid' %}<span class="badge badge-done">valid</span>{% elif r.validation_status == 'invalid' %}<span class="badge badge-danger">invalid</span>{% else %}<span class="badge">pending</span>{% endif %}</td>
+        <td>{% if r.send_status == 'sent' %}<span class="badge badge-done">sent</span>{% elif r.send_status == 'bounced' %}<span class="badge badge-danger">bounced</span>{% elif r.send_status == 'opened' %}<span class="badge badge-done">opened</span>{% else %}<span class="badge">pending</span>{% endif %}</td>
         <td>
-          <form method="POST" action="/commercial/campaigns/{{ campaign.id }}/recipients/{{ r.id }}/delete" style="display:inline;" onsubmit="return confirm('Remove this recipient?');">
-            <button type="submit" class="btn btn-danger btn-sm" style="padding:0.1rem 0.4rem;font-size:0.65rem;">✕</button>
+          <form method="POST" action="/commercial/campaigns/{{ campaign.id }}/recipients/{{ r.id }}/delete" style="display:inline;" onsubmit="return confirm('Remove recipient {{ r.first_name }} {{ r.last_name }}?');">
+            <button type="submit" style="background:#d63031;color:#fff;border:none;padding:0.15rem 0.5rem;border-radius:3px;cursor:pointer;font-size:0.75rem;">X Remove</button>
           </form>
         </td>
       </tr>{% endfor %}
@@ -63,9 +50,9 @@
   </table>
   {% if total_pages > 1 %}
   <div style="margin-top:1rem;display:flex;justify-content:center;align-items:center;gap:0.4rem;flex-wrap:wrap;padding:0.5rem;background:#f8f9fa;border-radius:6px;">
-    {% if page > 1 %}<a href="?page=1&sort={{ sort }}&order={{ order }}" class="btn btn-outline btn-sm">&laquo; First</a><a href="?page={{ page-1 }}&sort={{ sort }}&order={{ order }}" class="btn btn-outline btn-sm">&lsaquo; Prev</a>{% endif %}
-    <span style="font-weight:600;color:#333;font-size:0.85rem;">Page {{ page }} of {{ total_pages }}</span>
-    {% if page < total_pages %}<a href="?page={{ page+1 }}&sort={{ sort }}&order={{ order }}" class="btn btn-outline btn-sm">Next &rsaquo;</a><a href="?page={{ total_pages }}&sort={{ sort }}&order={{ order }}" class="btn btn-outline btn-sm">Last &raquo;</a>{% endif %}
+    {% if page > 1 %}<a href="?page=1&sort={{ sort }}&order={{ order }}" class="btn btn-outline btn-sm">First</a><a href="?page={{ page-1 }}&sort={{ sort }}&order={{ order }}" class="btn btn-outline btn-sm">Prev</a>{% endif %}
+    <span style="font-weight:600;font-size:0.85rem;">Page {{ page }} of {{ total_pages }}</span>
+    {% if page < total_pages %}<a href="?page={{ page+1 }}&sort={{ sort }}&order={{ order }}" class="btn btn-outline btn-sm">Next</a><a href="?page={{ total_pages }}&sort={{ sort }}&order={{ order }}" class="btn btn-outline btn-sm">Last</a>{% endif %}
   </div>
   {% endif %}
 </div>
