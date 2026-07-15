@@ -3,179 +3,99 @@
 <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem;">
   <div>
     <h2 style="margin:0;">📧 {{ campaign.name }}</h2>
-    {% if campaign.subject_line %}<p style="color:#888;margin:0.3rem 0 0;">Subject: {{ campaign.subject_line }}</p>{% endif %}
+    {% if campaign.description %}<p style="color:#888;margin:0.3rem 0 0;">{{ campaign.description }}</p>{% endif %}
   </div>
   <div class="actions">
-    <a href="/marketing/campaigns/{{ campaign.id }}/edit" class="btn btn-outline btn-sm">Edit</a>
-    <form method="POST" action="/marketing/campaigns/{{ campaign.id }}/delete" style="display:inline;" onsubmit="return confirm('Delete this campaign?');">
+    <a href="/commercial/campaigns/{{ campaign.id }}/recipients" class="btn btn-primary btn-sm">+ Add Recipients</a>
+    <a href="/commercial/campaigns/{{ campaign.id }}/validate" class="btn btn-primary btn-sm">✓ Validate</a>
+    <a href="/commercial/campaigns/{{ campaign.id }}/send" class="btn btn-primary btn-sm">🚀 Send</a>
+    <form method="POST" action="/commercial/campaigns/{{ campaign.id }}/delete" style="display:inline;" onsubmit="return confirm('Delete this campaign?');">
       <button type="submit" class="btn btn-danger btn-sm">Delete</button>
     </form>
   </div>
 </div>
 
-<!-- Detail cards -->
 <div class="stats">
-  <div class="stat">
-    <div class="num">{{ campaign.total_recipients }}</div>
-    <div class="label">Total Sent</div>
-  </div>
-  <div class="stat">
-    <div class="num">{{ campaign.total_opened }}</div>
-    <div class="label">Opened</div>
-  </div>
-  <div class="stat">
-    <div class="num">{{ campaign.total_clicked }}</div>
-    <div class="label">Clicked</div>
-  </div>
-  <div class="stat">
-    <div class="num">{{ "%.1f"|format(campaign.total_opened / campaign.total_recipients * 100) if campaign.total_recipients > 0 else "0.0" }}%</div>
-    <div class="label">Open Rate</div>
-  </div>
+  <div class="stat"><div class="num">{{ stats.total }}</div><div class="label">Total Recipients</div></div>
+  <div class="stat"><div class="num">{{ stats.validated }}</div><div class="label">Validated</div></div>
+  <div class="stat"><div class="num">{{ stats.invalid }}</div><div class="label">Invalid</div></div>
+  <div class="stat"><div class="num">{{ stats.sent }}</div><div class="label">Sent</div></div>
+</div>
+<div class="stats" style="margin-top:0.5rem;">
+  <div class="stat"><div class="num">{{ stats.opened }}</div><div class="label">Opened</div></div>
+  <div class="stat"><div class="num">{{ stats.bounced }}</div><div class="label">Bounced</div></div>
+  <div class="stat"><div class="num">{{ stats.delivered }}</div><div class="label">Delivered</div></div>
+  <div class="stat"><div class="num">{{ stats.pending_validation }}</div><div class="label">Pending Validation</div></div>
 </div>
 
-<div class="stats">
-  <div class="stat">
-    <div class="num">{{ campaign.total_bounced }}</div>
-    <div class="label">Bounced</div>
-  </div>
-  <div class="stat">
-    <div class="num">{{ campaign.total_unsubscribed }}</div>
-    <div class="label">Unsubscribed</div>
-  </div>
-  <div class="stat">
-    <div class="num">
-      <span class="badge {% if campaign.status == 'draft' %}badge-research{% elif campaign.status in ('sent','completed') %}badge-done{% else %}badge-research{% endif %}">
-        {{ campaign.status|capitalize }}
-      </span>
-    </div>
-    <div class="label">Status</div>
-  </div>
-  <div class="stat">
-    <div class="num" style="font-size:1rem;">{{ campaign.audience_type|capitalize }}</div>
-    <div class="label">Audience</div>
-  </div>
-</div>
-
-<!-- Charts -->
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-top:1rem;">
-  <div class="card">
-    <h3 style="margin-bottom:1rem;">Engagement Breakdown</h3>
-    <canvas id="engagementChart" style="max-height:250px;"></canvas>
-  </div>
-  <div class="card">
-    <h3 style="margin-bottom:1rem;">Conversion Funnel</h3>
-    <canvas id="funnelChart" style="max-height:250px;"></canvas>
-  </div>
-</div>
-
-<!-- Recipient List -->
 <div class="card" style="margin-top:1.5rem;">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
-    <h3 style="margin:0;">Recipients ({{ sends|length }})</h3>
-    <a href="/marketing/campaigns/{{ campaign.id }}/sends/add" class="btn btn-primary btn-sm">+ Log Send</a>
+  <h3 style="margin:0 0 0.5rem 0;">Recipients ({{ stats.total }})</h3>
+
+  {% if total_pages > 1 %}
+  <div style="margin-bottom:0.75rem;display:flex;justify-content:center;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+    {% if page > 1 %}
+    <a class="btn btn-outline btn-sm" href="?page=1&sort={{ sort }}&order={{ order }}">&laquo; First</a>
+    <a class="btn btn-outline btn-sm" href="?page={{ page-1 }}&sort={{ sort }}&order={{ order }}">Prev</a>
+    {% endif %}
+    <span style="color:#666;font-size:0.85rem;">Page {{ page }} of {{ total_pages }} ({{ ((page-1)*50 + 1) }}-{{ [page*50, stats.total]|min }} of {{ stats.total }})</span>
+    {% if page < total_pages %}
+    <a class="btn btn-outline btn-sm" href="?page={{ page+1 }}&sort={{ sort }}&order={{ order }}">Next</a>
+    <a class="btn btn-outline btn-sm" href="?page={{ total_pages }}&sort={{ sort }}&order={{ order }}">Last &raquo;</a>
+    {% endif %}
   </div>
+  {% endif %}
+
   <table>
     <thead>
       <tr>
-        <th>Recipient</th>
-        <th>Email</th>
-        <th>Type</th>
-        <th>Company/Base</th>
-        <th>Sent</th>
-        <th>Opened</th>
-        <th>Clicked</th>
-        <th>Bounced</th>
+        <th><a href="?sort=first_name&order={% if sort=='first_name' %}{{ next_order }}{% else %}asc{% endif %}">Contact {% if sort=='first_name' %}{% if order=='asc' %}&#9650;{% else %}&#9660;{% endif %}{% endif %}</a></th>
+        <th><a href="?sort=email&order={% if sort=='email' %}{{ next_order }}{% else %}asc{% endif %}">Email {% if sort=='email' %}{% if order=='asc' %}&#9650;{% else %}&#9660;{% endif %}{% endif %}</a></th>
+        <th><a href="?sort=company_name&order={% if sort=='company_name' %}{{ next_order }}{% else %}asc{% endif %}">Company {% if sort=='company_name' %}{% if order=='asc' %}&#9650;{% else %}&#9660;{% endif %}{% endif %}</a></th>
+        <th><a href="?sort=sector&order={% if sort=='sector' %}{{ next_order }}{% else %}asc{% endif %}">Sector {% if sort=='sector' %}{% if order=='asc' %}&#9650;{% else %}&#9660;{% endif %}{% endif %}</a></th>
+        <th><a href="?sort=validation_status&order={% if sort=='validation_status' %}{{ next_order }}{% else %}asc{% endif %}">Validation {% if sort=='validation_status' %}{% if order=='asc' %}&#9650;{% else %}&#9660;{% endif %}{% endif %}</a></th>
+        <th><a href="?sort=send_status&order={% if sort=='send_status' %}{{ next_order }}{% else %}asc{% endif %}">Send Status {% if sort=='send_status' %}{% if order=='asc' %}&#9650;{% else %}&#9660;{% endif %}{% endif %}</a></th>
       </tr>
     </thead>
     <tbody>
-      {% for s in sends %}
+      {% for r in recipients %}
       <tr>
-        <td>{{ s.recipient_name or '-' }}</td>
-        <td>{{ s.recipient_email or '-' }}</td>
-        <td><span style="font-size:0.8rem;">{{ s.contact_type|capitalize }}</span></td>
+        <td><strong>{{ r.first_name or '' }} {{ r.last_name or '' }}</strong></td>
+        <td><small>{{ r.email or '-' }}</small></td>
+        <td>{{ r.company_name or '-' }}</td>
+        <td>{{ r.sector or '-' }}</td>
         <td>
-          {% if s.company_name %}{{ s.company_name }}
-          {% elif s.base_name %}{{ s.base_name }}
-          {% else %}-{% endif %}
+          {% if r.validation_status == 'valid' %}<span class="badge badge-done">valid</span>
+          {% elif r.validation_status == 'invalid' %}<span class="badge badge-danger">invalid</span>
+          {% elif r.validation_status == 'catch_all' %}<span class="badge badge-research">catch-all</span>
+          {% else %}<span class="badge">pending</span>{% endif %}
         </td>
-        <td><small>{{ s.sent_at.strftime('%Y-%m-%d %H:%M') if s.sent_at else '-' }}</small></td>
-        <td>{% if s.opened_at %}✅ <small>{{ s.opened_at.strftime('%m-%d %H:%M') }}</small>{% else %}❌{% endif %}</td>
-        <td>{% if s.clicked_at %}👆 <small>{{ s.clicked_at.strftime('%m-%d %H:%M') }}</small>{% else %}-{% endif %}</td>
-        <td>{% if s.bounced %}⚠️{% else %}-{% endif %}</td>
+        <td>
+          {% if r.send_status == 'sent' %}<span class="badge badge-done">sent</span>
+          {% elif r.send_status == 'opened' %}<span class="badge badge-done">opened</span>
+          {% elif r.send_status == 'bounced' %}<span class="badge badge-danger">bounced</span>
+          {% elif r.send_status == 'delivered' %}<span class="badge badge-done">delivered</span>
+          {% else %}<span class="badge">pending</span>{% endif %}
+        </td>
       </tr>
       {% endfor %}
-      {% if not sends %}
-      <tr><td colspan="8" style="text-align:center;padding:2rem;color:#888;">
-        No recipients logged yet.
-        <a href="/marketing/campaigns/{{ campaign.id }}/sends/add">Log the first send</a>.
-      </td></tr>
+      {% if not recipients %}
+      <tr><td colspan="6" style="text-align:center;padding:2rem;color:#888;">No recipients yet.</td></tr>
       {% endif %}
     </tbody>
   </table>
+
+  {% if total_pages > 1 %}
+  <div style="margin-top:0.75rem;display:flex;justify-content:center;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+    {% if page > 1 %}
+    <a class="btn btn-outline btn-sm" href="?page=1&sort={{ sort }}&order={{ order }}">&laquo; First</a>
+    <a class="btn btn-outline btn-sm" href="?page={{ page-1 }}&sort={{ sort }}&order={{ order }}">Prev</a>
+    {% endif %}
+    <span style="color:#666;font-size:0.85rem;">Page {{ page }} of {{ total_pages }}</span>
+    {% if page < total_pages %}
+    <a class="btn btn-outline btn-sm" href="?page={{ page+1 }}&sort={{ sort }}&order={{ order }}">Next</a>
+    <a class="btn btn-outline btn-sm" href="?page={{ total_pages }}&sort={{ sort }}&order={{ order }}">Last &raquo;</a>
+    {% endif %}
+  </div>
+  {% endif %}
 </div>
-{% endblock %}
-
-{% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script>
-(function() {
-  const data = {{ chart_data|safe }};
-
-  // Engagement doughnut
-  const engCtx = document.getElementById('engagementChart');
-  if (engCtx) {
-    new Chart(engCtx, {
-      type: 'doughnut',
-      data: {
-        labels: ['Opened', 'Clicked', 'Bounced', 'Unsubscribed', 'No Engagement'],
-        datasets: [{
-          data: [data.opened, data.clicked, data.bounced, data.unsubscribed, data.no_engagement],
-          backgroundColor: ['#00d4aa', '#00b894', '#ff7675', '#fab1a0', '#dfe6e9']
-        }]
-      },
-      options: {
-        responsive: true,
-        plugins: { legend: { position: 'bottom' } }
-      }
-    });
-  }
-
-  // Funnel bar
-  const fnCtx = document.getElementById('funnelChart');
-  if (fnCtx) {
-    const total = data.total || 1;
-    new Chart(fnCtx, {
-      type: 'bar',
-      data: {
-        labels: ['Sent', 'Opened', 'Clicked'],
-        datasets: [{
-          label: 'Recipients',
-          data: [data.total, data.opened, data.clicked],
-          backgroundColor: ['#1a1a2e', '#00d4aa', '#00b894']
-        }]
-      },
-      options: {
-        indexAxis: 'y',
-        responsive: true,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: function(ctx) {
-                const pct = (ctx.raw / total * 100).toFixed(1);
-                return ctx.raw + ' (' + pct + '%)';
-              }
-            }
-          }
-        },
-        scales: {
-          x: {
-            title: { display: true, text: 'Count' }
-          }
-        }
-      }
-    });
-  }
-})();
-</script>
 {% endblock %}

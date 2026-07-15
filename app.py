@@ -748,30 +748,47 @@ def campaign_view(id):
     campaign = query_one("SELECT * FROM campaigns WHERE id=%s", (id,))
     if not campaign: flash('Campaign not found', 'error'); return redirect('/commercial/campaigns')
     
-    recipients = query("""
+    # Paging & sorting
+    page = request.args.get('page', 1, type=int)
+    sort_col = request.args.get('sort', 'last_name')
+    order = request.args.get('order', 'asc')
+    page = max(1, page)
+    cols = ['first_name','last_name','email','company_name','role','sector','validation_status','send_status']
+    if sort_col not in cols: sort_col = 'last_name'
+    if order not in ('asc','desc'): order = 'asc'
+    next_order = 'desc' if order == 'asc' else 'asc'
+    PAGE_SIZE = 50
+    
+    stats = {
+        'total': query_val("SELECT count(*) FROM campaign_recipients WHERE campaign_id=%s", (id,)),
+        'validated': query_val("SELECT count(*) FROM campaign_recipients WHERE campaign_id=%s AND validation_status='valid'", (id,)),
+        'invalid': query_val("SELECT count(*) FROM campaign_recipients WHERE campaign_id=%s AND validation_status='invalid'", (id,)),
+        'pending_validation': query_val("SELECT count(*) FROM campaign_recipients WHERE campaign_id=%s AND (validation_status IS NULL OR validation_status='')", (id,)),
+        'sent': query_val("SELECT count(*) FROM campaign_recipients WHERE campaign_id=%s AND send_status='sent'", (id,)),
+        'delivered': query_val("SELECT count(*) FROM campaign_recipients WHERE campaign_id=%s AND send_status='delivered'", (id,)),
+        'opened': query_val("SELECT count(*) FROM campaign_recipients WHERE campaign_id=%s AND send_status='opened'", (id,)),
+        'bounced': query_val("SELECT count(*) FROM campaign_recipients WHERE campaign_id=%s AND send_status='bounced'", (id,)),
+    }
+    
+    total_pages = max(1, (stats['total'] + PAGE_SIZE - 1) // PAGE_SIZE)
+    page = min(page, total_pages)
+    offset = (page - 1) * PAGE_SIZE
+    
+    recipients = query(f"""
         SELECT cr.*, co.first_name, co.last_name, co.role, co.email,
                c.name as company_name, c.sector
         FROM campaign_recipients cr
         JOIN contacts co ON co.id = cr.contact_id
         JOIN companies c ON c.id = co.company_id
         WHERE cr.campaign_id = %s
-        ORDER BY co.first_name, co.last_name
+        ORDER BY {sort_col} {order}
+        LIMIT {PAGE_SIZE} OFFSET {offset}
     """, (id,))
     
-    stats = {
-        'total': len(recipients),
-        'validated': sum(1 for r in recipients if r.validation_status == 'valid'),
-        'invalid': sum(1 for r in recipients if r.validation_status == 'invalid'),
-        'pending_validation': sum(1 for r in recipients if not r.validation_status),
-        'sent': sum(1 for r in recipients if r.send_status == 'sent'),
-        'delivered': sum(1 for r in recipients if r.send_status == 'delivered'),
-        'opened': sum(1 for r in recipients if r.send_status == 'opened'),
-        'bounced': sum(1 for r in recipients if r.send_status == 'bounced'),
-    }
-    
     return render_template('campaign_view.html', campaign=campaign, recipients=recipients,
-                          stats=stats, section='commercial', active_page='commercial_campaigns')
-
+                          stats=stats, page=page, total_pages=total_pages,
+                          sort=sort_col, order=order, next_order=next_order,
+                          section='commercial', active_page='commercial_campaigns')
 @app.route('/commercial/campaigns/<int:id>/recipients', methods=['GET', 'POST'])
 def campaign_recipients(id):
     campaign = query_one("SELECT * FROM campaigns WHERE id=%s", (id,))
