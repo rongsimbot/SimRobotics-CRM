@@ -795,6 +795,28 @@ def campaign_view(id):
     resp.headers['Expires'] = '0'
     return resp
 
+@app.route('/commercial/campaigns/<int:id>/edit', methods=['GET', 'POST'])
+def commercial_campaign_edit(id):
+    campaign = query_one("SELECT * FROM campaigns WHERE id=%s", (id,))
+    if not campaign: flash('Campaign not found', 'error'); return redirect('/commercial/campaigns')
+    if request.method == 'POST':
+        data = {
+            'name': request.form['name'],
+            'description': request.form.get('description') or None,
+            'sender_name': request.form.get('sender_name') or None,
+            'sender_email': request.form.get('sender_email') or None,
+            'subject_template': request.form.get('subject_template') or None,
+            'body_template': request.form.get('body_template') or None,
+            'target_sector': request.form.get('target_sector') or None,
+            'target_region': request.form.get('target_region') or None,
+            'target_is_customer': request.form.get('target_is_customer', 'no'),
+        }
+        sets = ', '.join(f"{k}=%s" for k in data)
+        vals = list(data.values()) + [id]
+        query(f"UPDATE campaigns SET {sets}, updated_at=CURRENT_TIMESTAMP WHERE id=%s", vals)
+        flash('Campaign updated!', 'success'); return redirect(f'/commercial/campaigns/{id}')
+    return render_template('campaign_edit.html', campaign=campaign, section='commercial', active_page='commercial_campaigns')
+
 @app.route('/commercial/campaigns/<int:id>/recipients/<int:recipient_id>/delete', methods=['POST'])
 def campaign_recipient_delete(id, recipient_id):
     query("DELETE FROM campaign_recipients WHERE id=%s AND campaign_id=%s", (recipient_id, id))

@@ -3,6 +3,7 @@
 <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem;">
   <div><h2 style="margin:0;">📧 {{ campaign.name }}</h2></div>
   <div style="display:flex;gap:0.4rem;">
+    <a href="/commercial/campaigns/{{ campaign.id }}/edit" class="btn btn-outline btn-sm">✏️ Edit Campaign</a>
     <a href="/commercial/campaigns/{{ campaign.id }}/recipients" class="btn btn-primary btn-sm">+ Add Recipients</a>
     <a href="/commercial/campaigns/{{ campaign.id }}/validate" class="btn btn-primary btn-sm">✓ Validate</a>
     <a href="/commercial/campaigns/{{ campaign.id }}/send" class="btn btn-primary btn-sm">🚀 Send</a>
