@@ -786,10 +786,14 @@ def campaign_view(id):
         LIMIT {PAGE_SIZE} OFFSET {offset}
     """, (id,))
     
-    return render_template('campaign_view.html', campaign=campaign, recipients=recipients,
+    resp = app.make_response(render_template('campaign_view.html', campaign=campaign, recipients=recipients,
                           stats=stats, page=page, total_pages=total_pages,
                           sort=sort_col, order=order, next_order=next_order,
-                          section='commercial', active_page='commercial_campaigns')
+                          section='commercial', active_page='commercial_campaigns'))
+    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    resp.headers['Pragma'] = 'no-cache'
+    resp.headers['Expires'] = '0'
+    return resp
 
 @app.route('/commercial/campaigns/<int:id>/recipients/<int:recipient_id>/delete', methods=['POST'])
 def campaign_recipient_delete(id, recipient_id):
