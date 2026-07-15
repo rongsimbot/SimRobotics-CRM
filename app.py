@@ -832,13 +832,13 @@ def campaign_recipients(id):
         where = ["co.email IS NOT NULL", "co.email != ''"]
         params = []
         
-        if campaign.target_sector:
+        if campaign.get('target_sector'):
             where.append("c.sector = %s")
-            params.append(campaign.target_sector)
-        if campaign.target_region:
+            params.append(campaign['target_sector'])
+        if campaign.get('target_region'):
             where.append("c.region ILIKE %s")
-            params.append(f'%{campaign.target_region}%')
-        if campaign.target_is_customer == 'no':
+            params.append(f'%{campaign["target_region"]}%')
+        if campaign.get('target_is_customer') == 'no':
             where.append("(c.is_existing_customer = false OR c.is_existing_customer IS NULL)")
         elif campaign.target_is_customer == 'yes':
             where.append("c.is_existing_customer = true")
@@ -872,13 +872,13 @@ def campaign_recipients(id):
     
     where = ["co.email IS NOT NULL", "co.email != ''"]
     params = []
-    if campaign.target_sector:
+    if campaign.get('target_sector'):
         where.append("c.sector = %s")
-        params.append(campaign.target_sector)
-    if campaign.target_region:
+        params.append(campaign['target_sector'])
+    if campaign.get('target_region'):
         where.append("c.region ILIKE %s")
-        params.append(f'%{campaign.target_region}%')
-    if campaign.target_is_customer == 'no':
+        params.append(f'%{campaign["target_region"]}%')
+    if campaign.get('target_is_customer') == 'no':
         where.append("(c.is_existing_customer = false OR c.is_existing_customer IS NULL)")
     elif campaign.target_is_customer == 'yes':
         where.append("c.is_existing_customer = true")
@@ -1027,13 +1027,13 @@ def campaign_validate(id):
             flash(f'Not enough ZeroBounce credits! Need {len(recipients)}, have {available}.', 'error')
             return redirect(f'/commercial/campaigns/{id}')
         
-        emails = [r.email for r in recipients]
+        emails = [r['email'] for r in recipients]
         flash(f'Validating {len(emails)} emails... This may take a minute.', 'info')
         
         # Run validation (do it synchronously but with progress)
         for i, r in enumerate(recipients):
             try:
-                result = validate_email(r.email)
+                result = validate_email(r['email'])
                 status = result.get('status', 'error')
                 sub_status = result.get('sub_status', '')
                 
@@ -1044,28 +1044,28 @@ def campaign_validate(id):
                     SELECT cr.contact_id, %s, %s, %s, %s, %s, %s, %s, %s, %s
                     FROM campaign_recipients cr WHERE cr.id = %s
                     ON CONFLICT DO NOTHING
-                """, (r.email, status, sub_status,
+                """, (r['email'], status, sub_status,
                       result.get('free_email', False),
                       result.get('did_you_mean'),
                       result.get('account'),
                       result.get('domain'),
                       str(result.get('domain_age_days', '')),
                       result.get('smtp_provider'),
-                      r.cr_id))
+                      r['cr_id']))
                 
                 # Update campaign_recipient
                 query("""
                     UPDATE campaign_recipients 
                     SET validation_status = %s
                     WHERE id = %s
-                """, (status, r.cr_id))
+                """, (status, r['cr_id']))
                 
                 time.sleep(0.3)  # Rate limit
                 
             except Exception as e:
                 query("""
                     UPDATE campaign_recipients SET validation_status = 'error', error_message = %s WHERE id = %s
-                """, (str(e)[:500], r.cr_id))
+                """, (str(e)[:500], r['cr_id']))
         
         # Update campaign counts
         query("""
