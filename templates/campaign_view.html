@@ -24,6 +24,7 @@
     {% if page < total_pages %}<a href="?page={{ page+1 }}&sort={{ sort }}&order={{ order }}" class="btn btn-outline btn-sm">Next</a><a href="?page={{ total_pages }}&sort={{ sort }}&order={{ order }}" class="btn btn-outline btn-sm">Last</a>{% endif %}
   </div>
   {% endif %}
+  <div style="overflow-x:auto;">
   <table>
     <thead><tr style="background:#f0f2f5;">
       <th><a href="?sort=last_name&order={% if sort=='last_name' %}{{ next_order }}{% else %}asc{% endif %}">Contact {% if sort=='last_name' %}{% if order=='asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
@@ -48,6 +49,8 @@
       </tr>{% endfor %}
     </tbody>
   </table>
+  </div>
+  </div>
   {% if total_pages > 1 %}
   <div style="margin-top:1rem;display:flex;justify-content:center;align-items:center;gap:0.4rem;flex-wrap:wrap;padding:0.5rem;background:#f8f9fa;border-radius:6px;">
     {% if page > 1 %}<a href="?page=1&sort={{ sort }}&order={{ order }}" class="btn btn-outline btn-sm">First</a><a href="?page={{ page-1 }}&sort={{ sort }}&order={{ order }}" class="btn btn-outline btn-sm">Prev</a>{% endif %}
