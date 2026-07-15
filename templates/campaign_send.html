@@ -5,27 +5,40 @@
 <div class="card" style="margin-bottom:1rem">
   <h3>Campaign Summary</h3>
   <p><strong>Target:</strong> {{ campaign.target_sector or 'All sectors' }} · {{ campaign.target_region or 'All regions' }}</p>
-  <p><strong>Pending recipients:</strong> {{ pending }}</p>
-  <p><strong>Already sent:</strong> {{ already_sent }}</p>
   <p><strong>Sender:</strong> {{ campaign.sender_name }} &lt;{{ campaign.sender_email }}&gt;</p>
   <p><strong>Subject:</strong> <code>{{ campaign.subject_template }}</code></p>
+  <hr style="margin:1rem 0">
+  <h4 style="margin-bottom:0.5rem">Recipient Status</h4>
+  <table style="max-width:450px;">
+    <tr><td>✅ Valid &amp; ready to send:</td><td><strong>{{ valid_sendable }}</strong></td></tr>
+    <tr><td>⚠️ Pending but unvalidated:</td><td><strong style="color:#e67e22;">{{ unvalidated }}</strong></td></tr>
+    <tr><td>❌ Invalid (will be skipped):</td><td><strong style="color:#e74c3c;">{{ invalid }}</strong></td></tr>
+  </table>
 </div>
 
-{% if pending > 0 %}
+{% if valid_sendable > 0 %}
 <div class="card">
   <h3 style="margin-bottom:0.5rem">Confirm Send</h3>
-  <p style="color:#e74c3c;margin-bottom:1rem">⚠️ This will send {{ pending }} emails via Brevo. This cannot be undone.</p>
+  <p style="color:#e74c3c;margin-bottom:1rem">⚠️ This will send <strong>{{ valid_sendable }}</strong> VALIDATED emails via Brevo. Invalid and unvalidated recipients will be skipped. This cannot be undone.</p>
+  {% if unvalidated > 0 %}
+  <p style="color:#e67e22;margin-bottom:0.5rem">⚠️ {{ unvalidated }} unvalidated recipients will NOT be sent. <a href="/commercial/campaigns/{{ campaign.id }}/validate">Run validation first →</a></p>
+  {% endif %}
   <form method="POST">
     <div class="form-group">
       <label>CC (optional, comma-separated)</label>
       <input type="text" name="cc" value="AndreaJ@simrobotics.com, synclairg@simrobotics.com" class="form-control" style="max-width:400px">
     </div>
-    <button type="submit" class="btn btn-primary" style="background:#e74c3c;margin-top:1rem" onclick="return confirm('Send {{ pending }} emails now?')">🚀 Send via Brevo</button>
+    <button type="submit" class="btn btn-primary" style="background:#e74c3c;margin-top:1rem" onclick="return confirm('Send {{ valid_sendable }} emails now?')">🚀 Send via Brevo</button>
   </form>
 </div>
 {% else %}
 <div class="card">
-  <p style="color:#888">No pending recipients. All emails have been sent. <a href="/commercial/campaigns/{{ campaign.id }}">Back to campaign</a>.</p>
+  <p style="color:#888">No validated recipients ready to send.</p>
+  {% if unvalidated > 0 %}
+  <p><a href="/commercial/campaigns/{{ campaign.id }}/validate" class="btn btn-primary">🔍 Run Validation First</a></p>
+  {% else %}
+  <p><a href="/commercial/campaigns/{{ campaign.id }}">← Back to campaign</a></p>
+  {% endif %}
 </div>
 {% endif %}
 {% endblock %}

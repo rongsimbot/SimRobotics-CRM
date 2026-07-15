@@ -967,7 +967,7 @@ def campaign_send(id):
             FROM campaign_recipients cr
             JOIN contacts co ON co.id = cr.contact_id
             JOIN companies c ON c.id = co.company_id
-            WHERE cr.campaign_id = %s AND (cr.send_status = 'pending' OR cr.send_status IS NULL)
+            WHERE cr.campaign_id = %s AND cr.validation_status = 'valid' AND (cr.send_status = 'pending' OR cr.send_status IS NULL)
         """, (id,))
         
         if not recipients:
@@ -1038,13 +1038,24 @@ def campaign_send(id):
         WHERE campaign_id=%s AND (send_status='pending' OR send_status IS NULL)
     """, (id,))
     
-    already_sent = query_val("""
+    valid_sendable = query_val("""
         SELECT count(*) FROM campaign_recipients 
-        WHERE campaign_id=%s AND send_status='sent'
+        WHERE campaign_id=%s AND validation_status='valid' AND (send_status='pending' OR send_status IS NULL)
+    """, (id,))
+    
+    invalid = query_val("""
+        SELECT count(*) FROM campaign_recipients 
+        WHERE campaign_id=%s AND validation_status='invalid'
+    """, (id,))
+    
+    unvalidated = query_val("""
+        SELECT count(*) FROM campaign_recipients 
+        WHERE campaign_id=%s AND (validation_status IS NULL OR validation_status NOT IN ('valid','invalid'))
     """, (id,))
     
     return render_template('campaign_send.html', campaign=campaign, 
-                          pending=pending, already_sent=already_sent,
+                          pending=pending, valid_sendable=valid_sendable,
+                          invalid=invalid, unvalidated=unvalidated,
                           section='commercial', active_page='commercial_campaigns')
 
 
