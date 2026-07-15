@@ -26,6 +26,19 @@
 </div>
 <div class="card" style="margin-top:1.5rem;">
   <h3 style="margin:0 0 0.75rem 0;">Recipients ({{ stats.total }})</h3>
+  <!-- Quick Add Form -->
+  <details style="margin-bottom:1rem;">
+    <summary style="cursor:pointer;font-weight:600;color:#00d4aa;font-size:0.9rem;">+ Quick Add Test Recipient</summary>
+    <form method="POST" action="/commercial/campaigns/{{ campaign.id }}/quick-add" style="margin-top:0.75rem;padding:0.75rem;background:#f8f9fa;border-radius:6px;">
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:flex-end;">
+        <div><label style="font-size:0.75rem;margin:0;">First Name</label><input type="text" name="first_name" style="padding:0.3rem;width:120px;" placeholder="John"></div>
+        <div><label style="font-size:0.75rem;margin:0;">Last Name</label><input type="text" name="last_name" style="padding:0.3rem;width:120px;" placeholder="Doe"></div>
+        <div><label style="font-size:0.75rem;margin:0;">Email *</label><input type="email" name="email" required style="padding:0.3rem;width:200px;" placeholder="john@example.com"></div>
+        <div><label style="font-size:0.75rem;margin:0;">Company</label><input type="text" name="company_name" style="padding:0.3rem;width:150px;" placeholder="ACME Corp"></div>
+        <div><button type="submit" class="btn btn-primary btn-sm">Add</button></div>
+      </div>
+    </form>
+  </details>
   {% if total_pages > 1 %}
   <div style="margin-bottom:1rem;display:flex;justify-content:center;align-items:center;gap:0.4rem;flex-wrap:wrap;padding:0.5rem;background:#f8f9fa;border-radius:6px;">
     {% if page > 1 %}<a href="?page=1&sort={{ sort }}&order={{ order }}" class="btn btn-outline btn-sm">&laquo; First</a><a href="?page={{ page-1 }}&sort={{ sort }}&order={{ order }}" class="btn btn-outline btn-sm">&lsaquo; Prev</a>{% endif %}

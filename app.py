@@ -817,6 +817,49 @@ def commercial_campaign_edit(id):
         flash('Campaign updated!', 'success'); return redirect(f'/commercial/campaigns/{id}')
     return render_template('campaign_edit.html', campaign=campaign, section='commercial', active_page='commercial_campaigns')
 
+@app.route('/commercial/campaigns/<int:id>/quick-add', methods=['POST'])
+def campaign_quick_add(id):
+    first_name = request.form.get('first_name', '').strip()
+    last_name = request.form.get('last_name', '').strip()
+    email = request.form.get('email', '').strip()
+    company_name = request.form.get('company_name', '').strip()
+    if not email:
+        flash('Email is required.', 'error')
+        return redirect(f'/commercial/campaigns/{id}')
+    # Upsert company
+    q = query_one("SELECT id FROM companies WHERE name=%s", (company_name,))
+    if not q and company_name:
+        query("INSERT INTO companies (name, sector) VALUES (%s, 'Unknown')", (company_name,))
+        company_id = query_val("SELECT id FROM companies WHERE name=%s", (company_name,))
+    elif q:
+        company_id = q['id']
+    else:
+        company_id = None
+    # Upsert contact
+    if company_id:
+        cq = query_one("SELECT id FROM contacts WHERE email=%s", (email,))
+        if not cq:
+            query("INSERT INTO contacts (company_id, first_name, last_name, email) VALUES (%s,%s,%s,%s)",
+                  (company_id, first_name, last_name, email))
+            contact_id = query_val("SELECT id FROM contacts WHERE email=%s", (email,))
+        else:
+            contact_id = cq['id']
+    else:
+        cq = query_one("SELECT id FROM contacts WHERE email=%s", (email,))
+        if not cq:
+            query("INSERT INTO contacts (first_name, last_name, email) VALUES (%s,%s,%s)", (first_name, last_name, email))
+            contact_id = query_val("SELECT id FROM contacts WHERE email=%s", (email,))
+        else:
+            contact_id = cq['id']
+    # Add to campaign if not already there
+    existing = query_val("SELECT count(*) FROM campaign_recipients WHERE campaign_id=%s AND contact_id=%s", (id, contact_id))
+    if existing == 0:
+        query("INSERT INTO campaign_recipients (campaign_id, contact_id, email) VALUES (%s,%s,%s)", (id, contact_id, email))
+        flash(f'{first_name} {last_name} ({email}) added to campaign!', 'success')
+    else:
+        flash('This person is already in the campaign.', 'warning')
+    return redirect(f'/commercial/campaigns/{id}')
+
 @app.route('/commercial/campaigns/<int:id>/recipients/<int:recipient_id>/delete', methods=['POST'])
 def campaign_recipient_delete(id, recipient_id):
     query("DELETE FROM campaign_recipients WHERE id=%s AND campaign_id=%s", (recipient_id, id))
