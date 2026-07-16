@@ -967,7 +967,7 @@ def campaign_send(id):
             FROM campaign_recipients cr
             JOIN contacts co ON co.id = cr.contact_id
             JOIN companies c ON c.id = co.company_id
-            WHERE cr.campaign_id = %s AND cr.validation_status = 'valid' AND (cr.send_status = 'pending' OR cr.send_status IS NULL)
+            WHERE cr.campaign_id = %s AND cr.validation_status = 'valid'
         """, (id,))
         
         if not recipients:
