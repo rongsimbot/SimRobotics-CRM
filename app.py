@@ -242,6 +242,170 @@ def commercial_outreach_form(id=None):
 @app.route('/commercial/outreach/<int:id>/delete', methods=['POST'])
 def commercial_outreach_delete(id): query("DELETE FROM commercial_outreach WHERE id=%s", (id,)); flash('Outreach record deleted.', 'success'); return redirect('/commercial/outreach')
 
+@app.route("/commercial/outreach/check-responses")
+def commercial_outreach_check_responses():
+    """Check Brevo stats AND scan inbox for campaign replies."""
+    import requests, json, datetime, msal
+    
+    results = {"success": True, "brevo_updated": 0, "replies_found": 0, "outreach_updated": 0, "message": ""}
+    
+    # ===== PART 1: Brevo Stats Update =====
+    try:
+        brevo_key = os.environ.get("BREVO_API_KEY", "")
+        if not brevo_key:
+            try:
+                brevo_key_file = open('/home/simrobotics/crm-crud/integrations/brevo.py').read()
+                import re
+                m = re.search(r"BREVO_API_KEY\s*=\s*'([^']+)'", brevo_key_file)
+                if m:
+                    brevo_key = m.group(1)
+            except:
+                pass
+    except:
+        brevo_key = os.environ.get("BREVO_API_KEY", "")
+    
+    headers = {"api-key": brevo_key}
+    
+    try:
+        # Get open events
+        all_events = []
+        for offset in range(0, 2000, 500):
+            resp = requests.get(
+                f"https://api.brevo.com/v3/smtp/statistics/events?days=2&limit=500&offset={offset}&event=opened",
+                headers=headers, timeout=15)
+            if resp.status_code == 200:
+                events = resp.json().get("events", [])
+                all_events.extend(events)
+                if len(events) < 500:
+                    break
+            else:
+                break
+        
+        # Map message IDs to campaigns
+        rows = query("SELECT brevo_message_id, campaign_id FROM campaign_recipients WHERE brevo_message_id IS NOT NULL AND send_status='sent'")
+        msg_map = {}
+        for row in rows:
+            msg_map[row["brevo_message_id"]] = row["campaign_id"]
+        
+        # Count opens per campaign
+        campaign_opens = {}
+        for event in all_events:
+            cid = msg_map.get(event.get("messageId", ""))
+            if cid:
+                if cid not in campaign_opens:
+                    campaign_opens[cid] = set()
+                campaign_opens[cid].add(event.get("email", ""))
+        
+        for cid, emails in campaign_opens.items():
+            query("UPDATE campaigns SET total_opened=%s, total_delivered=total_sent, updated_at=CURRENT_TIMESTAMP WHERE id=%s", 
+                 (len(emails), cid))
+            results["brevo_updated"] += 1
+        
+        msg_parts = [f"Brevo: {len(all_events)} open events, {results['brevo_updated']} campaigns updated"]
+    except Exception as e:
+        msg_parts = [f"Brevo: error ({str(e)[:80]})"]
+    
+    # ===== PART 2: Inbox Scan =====
+    try:
+        MS_TENANT = os.environ.get("MS_TENANT_ID", "05f0b3c2-780b-47f7-b10c-68b3ad3d5169")
+        MS_CLIENT = os.environ.get("MS_CLIENT_ID", "4520e90c-7205-440e-b51f-63b8f9d94225")
+        MS_SECRET = os.environ.get("MS_CLIENT_SECRET", "")
+        
+        app_ms = msal.ConfidentialClientApplication(
+            MS_CLIENT, authority=f"https://login.microsoftonline.com/{MS_TENANT}",
+            client_credential=MS_SECRET
+        )
+        token_result = app_ms.acquire_token_for_client(scopes=["https://graph.microsoft.com/.default"])
+        if "access_token" not in token_result:
+            raise Exception("MS Graph auth failed")
+        
+        gh = {"Authorization": f"Bearer {token_result['access_token']}"}
+        
+        # Search Ronnie's inbox for campaign replies
+        url = "https://graph.microsoft.com/v1.0/users/rong@simrobotics.com/mailFolders/inbox/messages"
+        params = {
+            "$top": 50, "$orderby": "receivedDateTime desc",
+            "$filter": "receivedDateTime ge 2026-07-14T00:00:00Z",
+            "$select": "subject,from,receivedDateTime,bodyPreview"
+        }
+        resp = requests.get(url, headers=gh, params=params)
+        
+        if resp.status_code == 200:
+            msgs = resp.json().get("value", [])
+            campaign_replies = []
+            for m in msgs:
+                subj = m.get("subject", "")
+                sender = m.get("from", {}).get("emailAddress", {})
+                sender_addr = sender.get("address", "")
+                sender_name = sender.get("name", "")
+                
+                # Skip our own, skip LinkedIn/notifications
+                if "simrobotics.com" in sender_addr.lower():
+                    continue
+                if "linkedin" in sender_addr.lower():
+                    continue
+                
+                is_reply = "RE:" in subj.upper()
+                is_auto = "automatic reply" in subj.lower()
+                is_campaign = "bim" in subj.lower() or "vdc" in subj.lower() or "simrobotics" in subj.lower()
+                
+                if is_reply or is_auto or is_campaign:
+                    campaign_replies.append({
+                        "email": sender_addr, "name": sender_name,
+                        "subject": subj, "received": m["receivedDateTime"],
+                        "preview": m.get("bodyPreview", "")[:300],
+                        "type": "auto-reply" if is_auto else "reply"
+                    })
+            
+            results["replies_found"] = len(campaign_replies)
+            
+            # Match replies to contacts and update outreach
+            for reply in campaign_replies:
+                contact = query_one("SELECT id, company_id, first_name, last_name FROM contacts WHERE email ILIKE %s", (reply["email"],))
+                if not contact:
+                    continue
+                
+                status = "Response Received" if reply["type"] == "reply" else "Auto-Reply"
+                reply_date = reply["received"][:10] if reply["received"] else datetime.date.today().isoformat()
+                
+                existing = query_one("SELECT id FROM commercial_outreach WHERE contact_id=%s ORDER BY created_at DESC LIMIT 1", (contact["id"],))
+                
+                if existing:
+                    query("""
+                        UPDATE commercial_outreach SET status=%s, response=%s,
+                            notes=COALESCE(notes,'') || ' | ' || %s,
+                            next_action=CASE WHEN %s='Response Received' THEN 'Follow up within 24 hours' ELSE next_action END
+                        WHERE id=%s
+                    """, (status, reply["preview"][:500], reply["preview"][:200], reply["type"], existing["id"]))
+                else:
+                    camp_name = "Email Campaign"
+                    camp = query_one("""
+                        SELECT c.name FROM campaign_recipients cr 
+                        JOIN campaigns c ON c.id=cr.campaign_id 
+                        WHERE cr.contact_id=%s LIMIT 1
+                    """, (contact["id"],))
+                    if camp:
+                        camp_name = camp["name"]
+                    
+                    query("""
+                        INSERT INTO commercial_outreach (company_id, contact_id, outreach_date, channel, subject, status, response, notes, next_action)
+                        VALUES (%s,%s,%s,'Email',%s,%s,%s,%s,%s)
+                    """, (contact["company_id"], contact["id"], reply_date, camp_name[:255],
+                          status, reply["preview"][:500],
+                          f"Campaign reply from {reply['name']}",
+                          'Follow up within 24 hours' if reply["type"] == "reply" else None))
+                
+                results["outreach_updated"] += 1
+            
+            msg_parts.append(f"Inbox: {len(campaign_replies)} replies, {results['outreach_updated']} outreach updated")
+        else:
+            msg_parts.append(f"Inbox: Graph API error {resp.status_code}")
+    except Exception as e:
+        msg_parts.append(f"Inbox: error ({str(e)[:80]})")
+    
+    results["message"] = ". ".join(msg_parts)
+    return results
+
 # ── Email Campaigns ─────────────────────────────────────────
 
 @app.route('/commercial/email-campaigns')
@@ -430,21 +594,24 @@ def military_contact_delete(id): query("DELETE FROM military_contacts WHERE id=%
 @app.route('/military/outreach')
 def military_outreach_list():
     q = request.args.get('q', ''); status = request.args.get('status', '')
+    branch_filter = request.args.get('branch', '')
     page = int(request.args.get('page', 1))
     sort = request.args.get('sort', 'outreach_date'); order = request.args.get('order', 'desc')
     where_parts = ["1=1"]; params = []
     if q: where_parts.append("(mo.subject ILIKE %s OR mo.notes ILIKE %s)"); params.extend([f'%{q}%']*2)
     if status: where_parts.append("mo.status = %s"); params.append(status)
+    if branch_filter: where_parts.append("mb.branch = %s"); params.append(branch_filter)
     w = " AND ".join(where_parts)
     if sort not in ALLOWED_SORT_COLS.get('military_outreach', []) or order not in ('asc', 'desc'):
         sort = 'outreach_date'; order = 'desc'
     base_sql = f"SELECT mo.*, mb.base_name, mc.contact_name FROM military_outreach mo LEFT JOIN military_bases mb ON mo.base_id = mb.id LEFT JOIN military_contacts mc ON mo.contact_id = mc.id WHERE {w}"
-    count_sql = f"SELECT count(*) FROM military_outreach mo WHERE {w}"
+    count_sql = f"SELECT count(*) FROM military_outreach mo LEFT JOIN military_bases mb ON mo.base_id = mb.id WHERE {w}"
     total = query_val(count_sql, tuple(params)); total_pages = max(1, math.ceil(total / PAGE_SIZE)); page = min(page, total_pages)
     offset = (page - 1) * PAGE_SIZE
     rows = query(base_sql + f" ORDER BY {sort} {order} NULLS LAST LIMIT {PAGE_SIZE} OFFSET {offset}", tuple(params))
-    statuses = query("SELECT DISTINCT status FROM military_outreach ORDER BY status")
-    return render_template('military_outreach.html', outreach_records=rows, query=q, status=status, statuses=statuses, page=page, total_pages=total_pages, total=total, sort=sort, order=order, section='military', active_page='military_outreach')
+    statuses = [{"status": s} for s in ["Not Contacted","Contacted","Response Received","Briefing Scheduled","Briefing Completed","Won","Lost","Archived","Plan Phase"]]
+    branches = query("SELECT DISTINCT mb.branch FROM military_outreach mo JOIN military_bases mb ON mo.base_id = mb.id WHERE mb.branch IS NOT NULL ORDER BY mb.branch")
+    return render_template('military_outreach.html', outreach_records=rows, query=q, status=status, statuses=statuses, branches=branches, branch_filter=branch_filter, page=page, total_pages=total_pages, total=total, sort=sort, order=order, section='military', active_page='military_outreach')
 
 @app.route('/military/outreach/add', methods=['GET', 'POST'])
 @app.route('/military/outreach/<int:id>/edit', methods=['GET', 'POST'])

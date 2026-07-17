@@ -2,14 +2,22 @@
 {% block content %}
 <h2 style="margin-bottom:0.5rem">📊 Outreach & Planning</h2>
 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem">
-  <a href="/military/outreach/add" class="btn btn-primary">+ Log Outreach</a>
-  <a href="/military/opportunities/add" class="btn btn-outline">+ Add Opportunity</a>
+  <div style="display:flex; gap:0.5rem">
+    <a href="/military/outreach/add" class="btn btn-primary">+ Log Outreach</a>
+    <a href="/military/opportunities/add" class="btn btn-outline">+ Add Opportunity</a>
+    <button id="check-responses-btn" class="btn btn-outline" onclick="checkCampaignResponses()" title="Check Brevo for campaign opens, clicks, and replies from last 7 days">📬 Check Campaign Responses</button>
+  </div>
 </div>
+<div id="response-check-result" style="display:none; margin-bottom:1rem; padding:0.75rem; border-radius:6px"></div>
 
 <div class="search-box">
-  <form method="GET" action="/military/outreach" style="display:flex; width:100%; gap:0.5rem">
-    <input type="text" name="q" value="{{ query }}" placeholder="Search by subject or notes..." style="flex:1">
-    <select name="status" onchange="this.form.submit()" style="width:auto">
+  <form method="GET" action="/military/outreach" style="display:flex; width:100%; gap:0.5rem; flex-wrap:wrap">
+    <select name="branch" style="width:auto">
+      <option value="">All Branches</option>
+      {% for b in branches %}<option value="{{ b.branch }}" {% if branch_filter==b.branch %}selected{% endif %}>{{ b.branch }}</option>{% endfor %}
+    </select>
+    <input type="text" name="q" value="{{ query }}" placeholder="Search by subject or notes..." style="flex:1; min-width:200px">
+    <select name="status" style="width:auto">
       <option value="">All Status</option>
       {% for s in statuses %}<option value="{{ s.status }}" {% if status==s.status %}selected{% endif %}>{{ s.status }}</option>{% endfor %}
     </select>
@@ -20,10 +28,10 @@
 <div class="card">
   <p style="margin-bottom:0.5rem; color:#888; font-size:0.85rem">{{ total }} outreach records</p>
   <table><thead><tr>
-    <th><a href="?q={{ query }}&status={{ status }}&sort=outreach_date&order={% if sort=='outreach_date' and order=='asc' %}desc{% else %}asc{% endif %}">Date {% if sort=='outreach_date' %}{% if order=='asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th><th>Base</th><th>Contact</th>
-    <th><a href="?q={{ query }}&status={{ status }}&sort=subject&order={% if sort=='subject' and order=='asc' %}desc{% else %}asc{% endif %}">Subject {% if sort=='subject' %}{% if order=='asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
+    <th><a href="?q={{ query }}&status={{ status }}&branch={{ branch_filter }}&sort=outreach_date&order={% if sort=='outreach_date' and order=='asc' %}desc{% else %}asc{% endif %}">Date {% if sort=='outreach_date' %}{% if order=='asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th><th>Base</th><th>Contact</th>
+    <th><a href="?q={{ query }}&status={{ status }}&branch={{ branch_filter }}&sort=subject&order={% if sort=='subject' and order=='asc' %}desc{% else %}asc{% endif %}">Subject {% if sort=='subject' %}{% if order=='asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th>
     <th>Response</th><th>Next Action</th>
-    <th><a href="?q={{ query }}&status={{ status }}&sort=status&order={% if sort=='status' and order=='asc' %}desc{% else %}asc{% endif %}">Status {% if sort=='status' %}{% if order=='asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th><th>Actions</th>
+    <th><a href="?q={{ query }}&status={{ status }}&branch={{ branch_filter }}&sort=status&order={% if sort=='status' and order=='asc' %}desc{% else %}asc{% endif %}">Status {% if sort=='status' %}{% if order=='asc' %}▲{% else %}▼{% endif %}{% endif %}</a></th><th>Actions</th>
   </tr></thead><tbody>
     {% for r in outreach_records %}<tr>
       <td>{{ r.outreach_date or '—' }}</td>
@@ -41,9 +49,43 @@
     <tr><td colspan="8" style="text-align:center;color:#888;padding:2rem">No records yet.</td></tr>{% endfor %}
   </tbody></table>
   {% if total_pages > 1 %}<div class="pagination">
-    {% if page > 1 %}<a href="?q={{ query }}&status={{ status }}&page={{ page-1 }}">←</a>{% else %}<span class="disabled">←</span>{% endif %}
+    {% if page > 1 %}<a href="?q={{ query }}&status={{ status }}&branch={{ branch_filter }}&page={{ page-1 }}">←</a>{% else %}<span class="disabled">←</span>{% endif %}
     <span class="current">{{ page }}/{{ total_pages }}</span>
-    {% if page < total_pages %}<a href="?q={{ query }}&status={{ status }}&page={{ page+1 }}">→</a>{% else %}<span class="disabled">→</span>{% endif %}
+    {% if page < total_pages %}<a href="?q={{ query }}&status={{ status }}&branch={{ branch_filter }}&page={{ page+1 }}">→</a>{% else %}<span class="disabled">→</span>{% endif %}
   </div>{% endif %}
 </div>
+
+<script>
+function checkCampaignResponses() {
+    const btn = document.getElementById("check-responses-btn");
+    const resultDiv = document.getElementById("response-check-result");
+    btn.disabled = true;
+    btn.textContent = "⏳ Checking...";
+    resultDiv.style.display = "block";
+    resultDiv.style.background = "#e8f4fd";
+    resultDiv.innerHTML = "<strong>⏳</strong> Checking Brevo for campaign responses...";
+
+    fetch("/commercial/outreach/check-responses")
+        .then(r => r.json())
+        .then(data => {
+            btn.disabled = false;
+            btn.textContent = "📬 Check Campaign Responses";
+            if (data.success) {
+                resultDiv.style.background = "#d4edda";
+                resultDiv.innerHTML = "<strong>✅ Done!</strong> " + data.message
+                    + " Campaigns updated: " + (data.campaigns_updated || 0)
+                    + ". New replies: " + (data.replies_created || 0) + ".";
+            } else {
+                resultDiv.style.background = "#f8d7da";
+                resultDiv.innerHTML = "<strong>❌ Error:</strong> " + data.message;
+            }
+        })
+        .catch(err => {
+            btn.disabled = false;
+            btn.textContent = "📬 Check Campaign Responses";
+            resultDiv.style.background = "#f8d7da";
+            resultDiv.innerHTML = "<strong>❌ Network error:</strong> " + err.message;
+        });
+}
+</script>
 {% endblock %}
