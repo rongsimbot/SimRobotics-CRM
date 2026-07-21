@@ -2,10 +2,8 @@
 """Brevo Transactional Email Integration for SimRobotics CRM"""
 import os, sys, json, requests, html, socket
 
-# Brevo API key - set via environment variable BREVO_API_KEY
 BREVO_API_KEY = os.environ.get('BREVO_API_KEY', '')
 BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email'
-
 # Force IPv4 for Brevo API (server's IPv6 address not authorized in Brevo IP whitelist)
 _orig_getaddrinfo = socket.getaddrinfo
 def _getaddrinfo_v4(host, port, family=0, *args, **kwargs):
@@ -17,16 +15,15 @@ def _use_ipv4():
 def _restore_dns():
     socket.getaddrinfo = _orig_getaddrinfo
 
+# HTML sanitization for entity-encoded templates
 def _sanitize_html(html_content):
-    """Ensure HTML is properly formatted for sending via Brevo.
-    Unescapes any entity-encoded HTML tags (&lt; &gt;) that may have been
-    double-escaped during template editing."""
     if not html_content:
         return html_content
     sanitized = html.unescape(html_content)
-    if '&lt;' in sanitized or '&gt;' in sanitized:
+    if "&lt;" in sanitized or "&gt;" in sanitized:
         sanitized = html.unescape(sanitized)
     return sanitized
+
 
 def send_email(sender_name, sender_email, to_email, to_name, subject, html_content, text_content='', cc=None, reply_to=None):
     """Send a single transactional email via Brevo."""
@@ -60,15 +57,9 @@ def send_email(sender_name, sender_email, to_email, to_name, subject, html_conte
         return {'success': False, 'error': data.get('message', str(resp.status_code)), 'details': data}
 
 def send_batch(sender_name, sender_email, recipients, subject_template, html_template, text_template='', cc=None):
-    """Send personalized emails via Brevo batch API."""
-    _use_ipv4()
-    try:
-        results = _send_batch_inner(sender_name, sender_email, recipients, subject_template, html_template, text_template, cc)
-    finally:
-        _restore_dns()
-    return results
-
-def _send_batch_inner(sender_name, sender_email, recipients, subject_template, html_template, text_template='', cc=None):
+    """Send personalized emails. Brevo batch API sends individually for true personalization.
+    recipients: list of dicts with keys: email, first_name, last_name, company
+    Returns list of result dicts."""
     results = []
     for i, r in enumerate(recipients):
         first = r.get('first_name', '')
@@ -90,12 +81,41 @@ def _send_batch_inner(sender_name, sender_email, recipients, subject_template, h
             text = text.replace('{last_name}', last)
             text = text.replace('{company}', company)
         
-        result = send_email(sender_name, sender_email, r['email'], full_name, subject, _sanitize_html(html), text, cc)
+        result = send_email(sender_name, sender_email, r['email'], full_name, subject, html, text, cc)
         result['email'] = r['email']
         result['contact_name'] = full_name
         results.append(result)
         
+        # Print progress
         status = '✓' if result['success'] else '✗'
+        print(f"  [{i+1}/{len(recipients)}] {status} {r['email']} - {full_name}")
+    
+    return results
+
+
+def send_batch(sender_name, sender_email, recipients, subject_template, html_template, text_template='', cc=None):
+    """Send personalized emails via Brevo batch API."""
+    results = []
+    for i, r in enumerate(recipients):
+        first = r.get('first_name', '')
+        last = r.get('last_name', '')
+        company = r.get('company', '')
+        full_name = f"{first} {last}".strip()
+        
+        subject = subject_template.replace('{first_name}', first)
+        subject = subject.replace('{last_name}', last)
+        subject = subject.replace('{company}', company)
+        
+        html = html_template.replace('{first_name}', first)
+        html = html.replace('{last_name}', last)
+        html = html.replace('{company}', company)
+        
+        result = send_email(sender_name, sender_email, r['email'], full_name, subject, _sanitize_html(html), '')
+        result['email'] = r['email']
+        result['contact_name'] = full_name
+        results.append(result)
+        
+        status = '+' if result['success'] else '-'
         print(f"  [{i+1}/{len(recipients)}] {status} {r['email']} - {full_name}")
     
     return results
@@ -115,8 +135,8 @@ if __name__ == '__main__':
         _use_ipv4()
         try:
             resp = requests.get('https://api.brevo.com/v3/account', headers={'api-key': BREVO_API_KEY})
-            print(json.dumps(resp.json(), indent=2))
         finally:
             _restore_dns()
+        print(json.dumps(resp.json(), indent=2))
     else:
         print("Usage: python3 brevo.py [test <email> [name]] | account")

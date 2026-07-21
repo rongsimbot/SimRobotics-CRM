@@ -1263,6 +1263,8 @@ def campaign_send(id):
         import brevo
         
         flash_msg = f'Sending {len(recip_dicts)} emails via Brevo...'
+        if cc_list:
+            flash(f'⚠️ CC list ({len(cc_list)} addresses) will receive a copy of every email ({len(recip_dicts)} sends × {len(cc_list)} CC = {len(recip_dicts) * len(cc_list)} extra credits!)', 'warning')
         flash(flash_msg, 'info')
         
         results = brevo.send_batch(
