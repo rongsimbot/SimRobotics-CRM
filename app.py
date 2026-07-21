@@ -318,12 +318,10 @@ def commercial_outreach_check_responses():
     try:
         brevo_key = os.environ.get("BREVO_API_KEY", "")
         if not brevo_key:
+            # Fallback: try to parse from brevo.py (compat with old Windows installs)
             try:
-                brevo_key_file = open('/home/simrobotics/crm-crud/integrations/brevo.py').read()
-                import re
-                m = re.search(r"BREVO_API_KEY\s*=\s*'([^']+)'", brevo_key_file)
-                if m:
-                    brevo_key = m.group(1)
+                import integrations.brevo as brevo_mod
+                brevo_key = getattr(brevo_mod, 'BREVO_API_KEY', '')
             except:
                 pass
     except:
