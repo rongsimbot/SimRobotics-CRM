@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """SimRobotics CRM v2.1 - Excel-Integrated Military CRM"""
-import os, sys, psycopg2, math, time
+import os, sys, psycopg2, math, time, html
 from flask import Flask, render_template, request, redirect, url_for, flash
 
 app = Flask(__name__)
@@ -75,6 +75,71 @@ def validate_email(email):
     import requests
     resp = requests.get(f'https://api.zerobounce.net/v2/validate?api_key=11bd8545466c4a32b99a9446fc28632c&email={email}', timeout=15)
     return resp.json() if resp.status_code == 200 else {'status': 'error'}
+
+def check_html_health(body_template):
+    """Check HTML template for entity encoding and formatting issues.
+    Returns {'clean': bool, 'issues': [str], 'severity': 'ok'|'warning'|'block'}."""
+    issues = []
+    if not body_template or not body_template.strip():
+        return {'clean': True, 'issues': [], 'severity': 'ok'}
+    
+    # 1. Entity encoding detection — BLOCKING issue
+    entity_patterns = {
+        '&lt;': 'HTML tags are entity-encoded (found &amp;lt; instead of <). This means <, > characters were double-escaped — emails will display raw HTML code instead of rendering.',
+        '&gt;': 'HTML tags are entity-encoded (found &amp;gt; instead of >).\n'
+    }
+    for entity, desc in entity_patterns.items():
+        if entity in body_template:
+            issues.append(desc)
+    
+    # 2. Check for other entity issues
+    if '&amp;lt;' in body_template or '&amp;gt;' in body_template:
+        issues.append('Double-encoded entities detected (&amp;amp;lt;). This suggests the HTML was entity-encoded twice.')
+    
+    # 3. Basic HTML structure checks — WARNING only
+    if '<html>' not in body_template.lower():
+        issues.append('Missing <html> tag — email may not render correctly in all clients.')
+    if '<body>' not in body_template.lower():
+        issues.append('Missing <body> tag — email may not render correctly in all clients.')
+    
+    # Severity: if any entity encoding found, it's a blocking issue
+    has_entities = ('&lt;' in body_template) or ('&gt;' in body_template)
+    has_warnings = len(issues) > 0
+    
+    if has_entities:
+        severity = 'block'
+    elif has_warnings:
+        severity = 'warning'
+    else:
+        severity = 'ok'
+    
+    return {'clean': not has_entities, 'issues': issues, 'severity': severity}
+
+def propagate_validation_status(campaign_id):
+    """After adding recipients to a campaign, check if any emails were already
+    validated in other campaigns and propagate that 'valid' status.
+    This prevents re-validating the same emails and burning ZeroBounce credits."""
+    query("""
+        UPDATE campaign_recipients cr
+        SET validation_status = 'valid'
+        FROM campaign_recipients cr2
+        WHERE cr.campaign_id = %s
+          AND cr.email = cr2.email
+          AND cr2.validation_status = 'valid'
+          AND cr2.campaign_id != cr.campaign_id
+          AND (cr.validation_status IS NULL OR cr.validation_status = '')
+    """, (campaign_id,))
+    
+    # Also check email_validations table as backup source
+    query("""
+        UPDATE campaign_recipients cr
+        SET validation_status = 'valid'
+        FROM email_validations ev
+        WHERE cr.campaign_id = %s
+          AND cr.email = ev.email
+          AND ev.status = 'valid'
+          AND (cr.validation_status IS NULL OR cr.validation_status = '')
+    """, (campaign_id,))
 
 def paginate(table, base_sql, count_sql, params, page, sort, order):
     page = max(1, page)
@@ -910,6 +975,11 @@ def campaign_new():
     return render_template('campaign_form.html', sectors=sectors, regions=regions,
                           section='commercial', active_page='commercial_campaigns')
 
+def _campaign_context(campaign):
+    """Enrich campaign with html_health and other computed fields for templates."""
+    html_health = check_html_health(campaign.get('body_template'))
+    return {'html_health': html_health}
+
 @app.route('/commercial/campaigns/<int:id>')
 def campaign_view(id):
     campaign = query_one("SELECT * FROM campaigns WHERE id=%s", (id,))
@@ -952,9 +1022,11 @@ def campaign_view(id):
         LIMIT {PAGE_SIZE} OFFSET {offset}
     """, (id,))
     
+    html_health = check_html_health(campaign.get('body_template'))
     resp = app.make_response(render_template('campaign_view.html', campaign=campaign, recipients=recipients,
                           stats=stats, page=page, total_pages=total_pages,
                           sort=sort_col, order=order, next_order=next_order,
+                          html_health=html_health,
                           section='commercial', active_page='commercial_campaigns'))
     resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     resp.headers['Pragma'] = 'no-cache'
@@ -966,13 +1038,25 @@ def commercial_campaign_edit(id):
     campaign = query_one("SELECT * FROM campaigns WHERE id=%s", (id,))
     if not campaign: flash('Campaign not found', 'error'); return redirect('/commercial/campaigns')
     if request.method == 'POST':
+        body_template = request.form.get('body_template') or None
+        html_health = check_html_health(body_template)
+        
+        if html_health['severity'] == 'block':
+            flash('⚠️ HTML ENTITY ENCODING DETECTED! Your email body has &lt; or &gt; entities. This means the HTML will display as raw code instead of rendering. Please fix the body_template before saving.', 'error')
+            for issue in html_health['issues']:
+                flash(f'  → {issue}', 'error')
+            # Still save but warn loudly
+        elif html_health['severity'] == 'warning':
+            for issue in html_health['issues']:
+                flash(f'⚠️ HTML Warning: {issue}', 'warning')
+        
         data = {
             'name': request.form['name'],
             'description': request.form.get('description') or None,
             'sender_name': request.form.get('sender_name') or None,
             'sender_email': request.form.get('sender_email') or None,
             'subject_template': request.form.get('subject_template') or None,
-            'body_template': request.form.get('body_template') or None,
+            'body_template': body_template,
             'target_sector': request.form.get('target_sector') or None,
             'target_region': request.form.get('target_region') or None,
             'target_is_customer': request.form.get('target_is_customer', 'no'),
@@ -981,7 +1065,11 @@ def commercial_campaign_edit(id):
         vals = list(data.values()) + [id]
         query(f"UPDATE campaigns SET {sets}, updated_at=CURRENT_TIMESTAMP WHERE id=%s", vals)
         flash('Campaign updated!', 'success'); return redirect(f'/commercial/campaigns/{id}')
-    return render_template('campaign_edit.html', campaign=campaign, section='commercial', active_page='commercial_campaigns')
+    
+    # GET: also compute html_health for display
+    html_health = check_html_health(campaign.get('body_template'))
+    return render_template('campaign_edit.html', campaign=campaign, html_health=html_health,
+                          section='commercial', active_page='commercial_campaigns')
 
 @app.route('/commercial/campaigns/<int:id>/quick-add', methods=['POST'])
 def campaign_quick_add(id):
@@ -1078,6 +1166,10 @@ def campaign_recipients(id):
         """, (id, id, id))
         
         count = query_val("SELECT count(*) FROM campaign_recipients WHERE campaign_id = %s", (id,))
+        
+        # FIX B: Cross-campaign validation — carry over 'valid' status from other campaigns
+        propagated = propagate_validation_status(id)
+        
         sync_commercial_to_marketing(id)
         flash(f'{count} recipients added to campaign!', 'success')
         return redirect(f'/commercial/campaigns/{id}')
@@ -1127,6 +1219,21 @@ def campaign_send(id):
     if not campaign: flash('Campaign not found', 'error'); return redirect('/commercial/campaigns')
     
     if request.method == 'POST':
+        # HTML HEALTH CHECK: unescape first (Jinja auto-escapes stored HTML)
+        # then verify the raw template isn't broken beyond repair
+        raw_body = campaign.get('body_template') or ''
+        sanitized_body = html.unescape(raw_body)
+        # Double-unescape if needed
+        if '&lt;' in sanitized_body or '&gt;' in sanitized_body:
+            sanitized_body = html.unescape(sanitized_body)
+        html_health = check_html_health(sanitized_body)
+        if html_health['severity'] == 'block':
+            flash('🚫 CANNOT SEND: HTML entity encoding detected in body_template!', 'error')
+            for issue in html_health['issues']:
+                flash(f'  → {issue}', 'error')
+            flash('Please edit the campaign and fix the HTML before sending.', 'error')
+            return redirect(f'/commercial/campaigns/{id}/send')
+        
         # Get all pending recipients
         recipients = query("""
             SELECT cr.id as cr_id, cr.email, co.first_name, co.last_name, 
@@ -1143,10 +1250,10 @@ def campaign_send(id):
         
         # Build recipient dicts for Brevo
         recip_dicts = [{
-            'email': r.email,
-            'first_name': r.first_name,
-            'last_name': r.last_name,
-            'company': r.company_name
+            'email': r['email'],
+            'first_name': r['first_name'],
+            'last_name': r['last_name'],
+            'company': r['company_name']
         } for r in recipients]
         
         # Get CC list from form
@@ -1161,11 +1268,11 @@ def campaign_send(id):
         flash(flash_msg, 'info')
         
         results = brevo.send_batch(
-            campaign.sender_name or 'Ronnie Gaines',
-            campaign.sender_email or 'rong@simrobotics.com',
+            campaign.get('sender_name') or 'Ronnie Gaines',
+            campaign.get('sender_email') or 'rong@simrobotics.com',
             recip_dicts,
-            campaign.subject_template or 'SimRobotics - BIM/VDC Services',
-            campaign.body_template or '<html><body><p>Hello {first_name},</p></body></html>',
+            campaign.get('subject_template') or 'SimRobotics - BIM/VDC Services',
+            campaign.get('body_template') or '<html><body><p>Hello {first_name},</p></body></html>',
             cc=cc_list
         )
         
@@ -1220,9 +1327,11 @@ def campaign_send(id):
         WHERE campaign_id=%s AND (validation_status IS NULL OR validation_status NOT IN ('valid','invalid'))
     """, (id,))
     
+    html_health = check_html_health(campaign.get('body_template'))
     return render_template('campaign_send.html', campaign=campaign, 
                           pending=pending, valid_sendable=valid_sendable,
                           invalid=invalid, unvalidated=unvalidated,
+                          html_health=html_health,
                           section='commercial', active_page='commercial_campaigns')
 
 
@@ -1235,7 +1344,10 @@ def campaign_validate(id):
     if not campaign: flash('Campaign not found', 'error'); return redirect('/commercial/campaigns')
     
     if request.method == 'POST':
-        # Get unvalidated recipients
+        # FIX D + B: First propagate any already-validated status from other campaigns
+        propagate_validation_status(id)
+        
+        # Get unvalidated recipients (after propagation, some may now be 'valid')
         recipients = query("""
             SELECT cr.id as cr_id, cr.email
             FROM campaign_recipients cr
@@ -1243,7 +1355,7 @@ def campaign_validate(id):
         """, (id,))
         
         if not recipients:
-            flash('No unvalidated recipients.', 'warning')
+            flash('No unvalidated recipients. (Already-valid emails from other campaigns were auto-marked valid — no credits burned!)', 'success')
             return redirect(f'/commercial/campaigns/{id}')
         
         # Check credits first

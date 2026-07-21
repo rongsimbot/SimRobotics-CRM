@@ -1,7 +1,10 @@
 {% extends "base.html" %}
 {% block content %}
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
-  <h2 style="margin:0;">✏️ Edit Campaign</h2>
+  <div>
+    <h2 style="margin:0;">✏️ Edit Campaign</h2>
+    {% if html_health %}{% include 'campaign_html_health.html' %}{% endif %}
+  </div>
   <a href="/commercial/campaigns/{{ campaign.id }}" class="btn btn-outline btn-sm">← Back to Campaign</a>
 </div>
 <div class="card">

@@ -1,0 +1,24 @@
+<!-- HTML Health Check Indicator -->
+{% if html_health.severity == 'ok' %}
+<div style="background:#d4edda;border:1px solid #c3e6cb;border-radius:6px;padding:0.4rem 0.75rem;margin-top:0.5rem;display:inline-block;">
+  <span style="color:#155724;font-weight:700;">✅ HTML Health: OK</span>
+  <span style="color:#155724;font-size:0.85rem;"> — No entity encoding or structural issues</span>
+</div>
+{% elif html_health.severity == 'warning' %}
+<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:6px;padding:0.5rem 0.75rem;margin-top:0.5rem;">
+  <span style="color:#856404;font-weight:700;">⚠️ HTML Health: Minor Issues</span>
+  {% for issue in html_health.issues %}
+  <div style="color:#664d03;font-size:0.8rem;margin-top:0.15rem;">→ {{ issue }}</div>
+  {% endfor %}
+</div>
+{% elif html_health.severity == 'block' %}
+<div style="background:#f8d7da;border:2px solid #dc3545;border-radius:6px;padding:0.75rem 1rem;margin-top:0.5rem;">
+  <span style="color:#721c24;font-weight:700;font-size:1rem;">🚫 HTML Health: ENTITY ENCODING DETECTED!</span>
+  {% for issue in html_health.issues %}
+  <div style="color:#721c24;font-size:0.85rem;margin-top:0.25rem;">→ {{ issue }}</div>
+  {% endfor %}
+  <div style="margin-top:0.5rem;">
+    <strong style="color:#721c24;">Fix:</strong> <span style="color:#721c24;">Edit the body_template and replace all <code>&amp;lt;</code> with <code>&lt;</code> and <code>&amp;gt;</code> with <code>&gt;</code>. This means the HTML was double-escaped — likely from copying rendered HTML out of a browser view instead of the source.</span>
+  </div>
+</div>
+{% endif %}

@@ -2,6 +2,8 @@
 {% block content %}
 <h2 style="margin-bottom:0.5rem">📤 Send Campaign — {{ campaign.name }}</h2>
 
+{% if html_health %}{% include 'campaign_html_health.html' %}{% endif %}
+
 <div class="card" style="margin-bottom:1rem">
   <h3>Campaign Summary</h3>
   <p><strong>Target:</strong> {{ campaign.target_sector or 'All sectors' }} · {{ campaign.target_region or 'All regions' }}</p>
